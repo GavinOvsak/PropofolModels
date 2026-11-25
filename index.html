@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Propofol Target Simulator</title>
+<meta name="description" content="Educational simulator that suggests manual propofol infusion rates for a chosen target effect-site concentration, using the Schnider, Marsh or Eleveld model.">
+<meta name="theme-color" content="#0e6a73">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: one centered column. Case bar on top, one huge rate, target buttons beneath, stepped chart last. */
+:root {
+  --bg: #f1f4f6;
+  --surface: #ffffff;
+  --ink: #14202b;
+  --ink2: #44525f;
+  --muted: #6f7c88;
+  --line: #dbe2e8;
+  --accent: #0e6a73;
+  --accent-ink: #ffffff;
+  --accent-soft: #e2f1f2;
+  --past: #8a97a3;
+  --bolus: #b45f06;
+  --warn-bg: #fff3dc;
+  --warn-ink: #6b4300;
+  --err-bg: #fde8e6;
+  --err-ink: #8a1f14;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e151b; --surface: #16202a; --ink: #e8eef3; --ink2: #aab7c3; --muted: #8995a1;
+    --line: #2a3744; --accent: #4fc1c9; --accent-ink: #06262a; --accent-soft: #14333a; --past: #6d7a86; --bolus: #f0a24c;
+    --warn-bg: #3a2c0e; --warn-ink: #f2d38b; --err-bg: #3d1a17; --err-ink: #f6b7b0; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e151b; --surface: #16202a; --ink: #e8eef3; --ink2: #aab7c3; --muted: #8995a1;
+  --line: #2a3744; --accent: #4fc1c9; --accent-ink: #06262a; --accent-soft: #14333a; --past: #6d7a86; --bolus: #f0a24c;
+  --warn-bg: #3a2c0e; --warn-ink: #f2d38b; --err-bg: #3d1a17; --err-ink: #f6b7b0; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.45 var(--font-body); -webkit-text-size-adjust: 100%; }
+.wrap { max-width: 760px; margin: 0 auto; padding: 16px 16px 48px; display: grid; gap: 14px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+h1 { margin: 0; font-size: 15px; font-weight: 600; color: var(--ink2); letter-spacing: 0.02em; }
+h2 { margin: 0 0 10px; font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink2); }
+.top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.clock { font: 500 14px var(--font-num); color: var(--muted); }
+.btn { min-height: 44px; padding: 0 16px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 10px; font: 500 15px var(--font-body); cursor: pointer; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.btn.small { min-height: 36px; padding: 0 12px; font-size: 14px; }
+.btn.danger-armed { background: var(--err-bg); color: var(--err-ink); border-color: var(--err-ink); }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.msg { padding: 10px 12px; border-radius: 8px; font-size: 14px; background: var(--warn-bg); color: var(--warn-ink); }
+.msg.err { background: var(--err-bg); color: var(--err-ink); }
+.msgs { display: grid; gap: 8px; }
+.msgs:empty { display: none; }
+
+/* resume */
+#resume { border-color: var(--accent); border-width: 2px; }
+#resume .sum { font-size: 17px; margin: 0 0 12px; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* case bar */
+.casebar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.casebar .sum { font-size: 15px; }
+.casebar .sum b { font-weight: 600; }
+.casebar .sum span { color: var(--ink2); }
+
+/* form */
+.field { display: grid; gap: 4px; margin-bottom: 12px; }
+.field > label, .field > .lab { font-size: 13px; color: var(--ink2); font-weight: 500; }
+.field .unit { color: var(--muted); font-weight: 400; }
+.row3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.row2.startrow { grid-template-columns: minmax(0, 1fr) auto; }
+.startrow .btn { white-space: nowrap; }
+input[type=time] { min-width: 0; max-width: 100%; -webkit-appearance: none; appearance: none; }
+.row2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: end; }
+input[type=number], input[type=time], select {
+  width: 100%; min-height: 44px; padding: 8px 10px; font: 500 16px var(--font-num);
+  color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+}
+select { font-family: var(--font-body); }
+input[aria-invalid="true"] { border-color: var(--err-ink); }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--bg); }
+.seg button { min-height: 44px; border: 0; background: transparent; color: var(--ink2); font: 500 15px var(--font-body); cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+
+/* hero */
+.hero { text-align: center; padding: 20px 16px 18px; }
+.hero .k { font-size: 14px; color: var(--ink2); font-weight: 500; }
+.hero .big { margin: 0; font: 600 clamp(88px, 22vw, 150px)/1 var(--font-num); letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+.hero .u { font: 500 22px var(--font-num); color: var(--ink2); margin-top: 2px; }
+.hero .sub { color: var(--muted); font-size: 14px; margin-top: 8px; }
+.hero .sub:empty { display: none; }
+.target { display: grid; grid-template-columns: 72px minmax(0, 1fr) 72px; gap: 10px; align-items: center; margin: 18px auto 0; max-width: 460px; }
+.target button { min-height: 68px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 12px; font: 500 34px var(--font-body); cursor: pointer; }
+.target button:active { background: var(--accent-soft); }
+.tbox { text-align: center; }
+.tbox .lab { font-size: 13px; color: var(--ink2); font-weight: 500; }
+.tbox input { text-align: center; font: 600 34px var(--font-num); min-height: 54px; border: 0; background: transparent; padding: 0; width: 100%; color: var(--ink); }
+.tbox input:focus-visible { outline-offset: 0; border-radius: 6px; }
+.tbox .unit { font: 500 14px var(--font-num); color: var(--ink2); }
+.next { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 15px; color: var(--ink2); }
+.next b { font-family: var(--font-num); color: var(--ink); font-weight: 600; }
+
+/* boluses */
+.bform { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) auto; gap: 8px; align-items: end; }
+.bform .field { margin-bottom: 0; }
+.bform input[type=number], .bform input[type=time] { padding: 8px 8px; }
+.bform .btn { min-width: 64px; padding: 0 14px; }
+.bform .field { min-width: 0; }
+.bform input { min-width: 0; width: 100%; max-width: 100%; box-sizing: border-box; }
+.bform input[type=time] { font-size: 15px; padding-right: 4px; }
+@media (max-width: 360px) { .bform { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto; gap: 6px; } .bform .btn { min-width: 54px; padding: 0 10px; } }
+.stepper { display: grid; grid-template-columns: minmax(0, 1fr) 34px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); overflow: hidden; }
+.stepper input { border: 0; border-radius: 0; min-height: 44px; background: transparent; -moz-appearance: textfield; appearance: textfield; }
+.stepper input::-webkit-outer-spin-button, .stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.stepper .arr { display: grid; grid-template-rows: 1fr 1fr; border-left: 1px solid var(--line); }
+.stepper .arr button { border: 0; background: transparent; color: var(--ink2); font-size: 11px; cursor: pointer; padding: 0; }
+.stepper .arr button + button { border-top: 1px solid var(--line); }
+.stepper .arr button:active { background: var(--accent-soft); }
+.bsub { display: flex; gap: 14px; margin-top: 6px; }
+.bis { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
+.bisq { background: var(--accent-soft); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; }
+.bisq-t { font-weight: 600; margin-bottom: 8px; }
+.bisq-r { display: flex; gap: 8px; align-items: center; }
+.bisq-r input { width: 84px; min-width: 0; padding: 8px; text-align: center; font: 600 18px var(--font-num); }
+.bisq-r .btn { min-width: 64px; padding: 0 14px; }
+.bissug { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; font-size: 15px; }
+.bissug .btn { margin-top: 8px; }
+.muted { color: var(--muted); font-size: 13px; }
+.bislinks { display: flex; gap: 18px; flex-wrap: wrap; }
+.bistab { width: 100%; border-collapse: collapse; font-size: 14px; margin: 8px 0 4px; }
+.bistab th { text-align: left; font-weight: 600; color: var(--muted); font-size: 12px; padding: 4px 6px 4px 0; }
+.bistab td { padding: 6px 6px 6px 0; border-top: 1px solid var(--line); font-family: var(--font-num); }
+.bisq[hidden], .bissug[hidden] { display: none; }
+.chk { display: flex; align-items: center; gap: 10px; margin: 4px 0 10px; font-size: 15px; color: var(--ink2); min-height: 44px; }
+.chk input { width: 22px; height: 22px; accent-color: var(--accent); flex: none; }
+.chk[hidden] { display: none; }
+.linkbtn { background: none; border: 0; padding: 6px 0; color: var(--accent); font: 500 14px var(--font-body); cursor: pointer; text-decoration: underline; }
+.brow { cursor: pointer; }
+.brow.editing { background: var(--accent-soft); margin: 0 -8px; padding-left: 8px; padding-right: 8px; border-radius: 8px; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip { min-height: 40px; min-width: 56px; padding: 0 12px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 10px; font: 500 15px var(--font-num); cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.blist { margin-top: 12px; display: grid; gap: 6px; }
+.brow { display: grid; grid-template-columns: 64px minmax(0, 1fr) minmax(0, 1fr) 40px; gap: 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); font-size: 15px; }
+.brow .bt { font: 600 16px var(--font-num); color: var(--bolus); }
+.brow .bm { font: 500 15px var(--font-num); }
+.brow .bago { color: var(--muted); font-size: 13px; }
+.brow.ign .bt, .brow.ign .bm { color: var(--muted); text-decoration: line-through; }
+.brow .del { min-height: 36px; border: 1px solid var(--line); background: var(--bg); color: var(--ink2); border-radius: 8px; font-size: 18px; cursor: pointer; }
+.tri { color: var(--bolus); font-style: normal; font-size: 12px; }
+.lblb { fill: var(--bolus); font: 600 11.5px var(--font-num); paint-order: stroke; stroke: var(--surface); stroke-width: 3px; }
+/* popup */
+.overlay { position: fixed; inset: 0; z-index: 20; background: rgba(8, 14, 20, 0.55); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.dialog { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; width: 100%; max-width: 440px; box-shadow: 0 12px 40px rgba(0,0,0,0.35); display: grid; gap: 12px; }
+.dialog h2 { margin: 0; }
+.dialog p { margin: 0; color: var(--ink2); font-size: 14px; }
+.ratebtn { display: block; margin: 6px auto 0; padding: 0 12px; background: transparent; border: 0; border-radius: 16px; color: inherit; cursor: pointer; font: inherit; }
+.ratebtn:active { background: var(--accent-soft); }
+.tapnote { font-size: 13px; color: var(--muted); margin-top: 4px; }
+.est { margin-top: 12px; font-size: 15px; color: var(--ink2); }
+.est b { font: 600 17px var(--font-num); color: var(--ink); }
+.est .d { color: var(--muted); }
+.count { font: 500 15px var(--font-body); color: var(--ink2); }
+.count .t { font: 600 30px/1.2 var(--font-num); color: var(--ink); display: block; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.count .to { font: 600 15px var(--font-num); color: var(--accent); }
+/* manual */
+.manual { display: grid; gap: 10px; }
+.mrow { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.mrow input { width: 150px; }
+.mres .btn { margin-top: 8px; }
+.mrow .unit { font: 500 15px var(--font-num); color: var(--ink2); }
+.mres { font-size: 16px; min-height: 24px; }
+.mres b { font: 600 20px var(--font-num); }
+.mres .hint { color: var(--muted); font-size: 14px; }
+
+/* chart */
+.chart { position: relative; touch-action: pan-y; }
+.chart svg { display: block; width: 100%; overflow: visible; }
+.ax { fill: var(--muted); font: 11.5px var(--font-num); }
+.axl { fill: var(--muted); font: 12px var(--font-body); }
+.lbl { fill: var(--ink); font: 600 12px var(--font-num); paint-order: stroke; stroke: var(--surface); stroke-width: 3px; }
+.tip { position: absolute; z-index: 5; pointer-events: none; background: var(--ink); color: var(--bg); border-radius: 8px; padding: 8px 10px; font: 13px/1.45 var(--font-num); white-space: nowrap; box-shadow: 0 4px 14px rgba(0,0,0,0.25); }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--ink2); margin: 0 0 6px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { display: inline-block; width: 18px; border-top: 3px solid; }
+.legend i.f { border-color: var(--accent); }
+.legend i.p { border-color: var(--past); border-top-width: 2px; }
+.notes { font-size: 13px; color: var(--muted); }
+.notes p { margin: 0 0 6px; }
+.stale { opacity: 0.45; }
+
+/* ticker rate */
+.big { display: inline-flex; justify-content: center; transform-origin: 50% 60%; }
+.big .dg { display: inline-block; height: 1em; overflow: hidden; position: relative; }
+.big .strip { display: flex; flex-direction: column; transition: transform 900ms cubic-bezier(.2,1.25,.3,1); will-change: transform; }
+.big .strip span { display: block; height: 1em; line-height: 1; }
+.big.pop { animation: ratepop 700ms cubic-bezier(.3,1.5,.5,1); }
+.big.pop.dn { animation-name: ratepopdn; }
+@keyframes ratepop { 0% { transform: scale(1); } 30% { transform: scale(1.16); } 60% { transform: scale(.97); } 100% { transform: scale(1); } }
+@keyframes ratepopdn { 0% { transform: scale(1); } 30% { transform: scale(.86); } 60% { transform: scale(1.03); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .big .strip { transition: none; } .big.pop { animation: none; } }
+
+/* #FOAM App ribbon (top right corner, links back to the FOAMapps directory) */
+body { position: relative; }
+.foam-ribbon { position: absolute; top: 0; right: 0; width: 120px; height: 120px; overflow: hidden; pointer-events: none; z-index: 10; }
+.foam-ribbon a { position: absolute; top: 26px; right: -60px; width: 200px; display: block; padding: 7px 0; transform: rotate(45deg); background: var(--accent); color: var(--accent-ink); font: 700 14px var(--font-body); letter-spacing: 0.04em; text-align: center; white-space: nowrap; text-decoration: none; box-shadow: 0 2px 6px rgba(0,0,0,0.2); pointer-events: auto; }
+.foam-ribbon a:hover { filter: brightness(1.1); }
+@media (max-width: 899px) { .top { display: block; } .top .clock { margin-top: 2px; } }
+</style>
+</head>
+<body>
+<div class="foam-ribbon"><a href="https://gavinovsak.github.io/FOAMapps/" target="_blank" rel="noopener noreferrer">#FOAM App</a></div>
+<div class="wrap">
+  <div class="top">
+    <h1>Propofol Target Simulator</h1>
+    <div class="clock" id="clock" aria-live="off"></div>
+  </div>
+
+  <section class="card" id="resume" hidden aria-labelledby="h-resume">
+    <h2 id="h-resume">Saved case found</h2>
+    <p class="sum" id="resume-sum"></p>
+    <div class="actions">
+      <button type="button" class="btn primary" id="r-continue">Same patient, continue</button>
+      <button type="button" class="btn" id="r-change">Change details</button>
+      <button type="button" class="btn" id="r-new">New patient</button>
+    </div>
+  </section>
+
+  <section class="card casebar" id="casebar" hidden>
+    <div class="sum" id="casesum"></div>
+    <div class="actions">
+      <button type="button" class="btn small" id="edit">Edit</button>
+      <button type="button" class="btn small" id="reset">Reset</button>
+    </div>
+  </section>
+
+  <section class="card" id="setup" hidden aria-labelledby="h-setup">
+    <h2 id="h-setup">Mock patient and start time</h2>
+    <div class="field">
+      <span class="lab" id="lab-sex">Sex</span>
+      <div class="seg" role="group" aria-labelledby="lab-sex" id="seg-sex">
+        <button type="button" data-v="M">Male</button>
+        <button type="button" data-v="F">Female</button>
+      </div>
+    </div>
+    <div class="row3">
+      <div class="field"><label for="age">Age <span class="unit">y</span></label><input id="age" type="number" inputmode="decimal" min="18" max="100" step="1"></div>
+      <div class="field"><label for="wt">Weight <span class="unit">kg</span></label><input id="wt" type="number" inputmode="decimal" min="30" max="250" step="0.5"></div>
+      <div class="field"><label for="ht">Height <span class="unit">cm</span></label><input id="ht" type="number" inputmode="decimal" min="120" max="220" step="1"></div>
+    </div>
+    <div class="row2 startrow">
+      <div class="field"><label for="start">Induction start time</label><input id="start" type="time"></div>
+      <div class="field"><button type="button" class="btn" id="startnow">Use now</button></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label for="model">Model</label>
+        <select id="model">
+          <option value="schnider">Schnider</option>
+          <option value="marsh">Marsh</option>
+          <option value="eleveld">Eleveld</option>
+        </select>
+      </div>
+      <div class="field" id="t0-field"><label for="t0">Target effect-site <span class="unit">mcg/mL</span></label><input id="t0" type="number" inputmode="decimal" min="0.5" max="10" step="0.1"></div>
+    </div>
+    <label class="chk" id="opioid-field" hidden><input type="checkbox" id="opioid"> <span>Opioid given with propofol (Eleveld uses this)</span></label>
+    <div class="msgs" id="ferr" aria-live="polite"></div>
+    <div class="actions" style="margin-top: 8px">
+      <button type="button" class="btn primary" id="done">Start case</button>
+    </div>
+  </section>
+
+  <div class="msgs" id="warn"></div>
+
+  <div id="main" hidden>
+    <section class="card hero" aria-labelledby="h-hero">
+      <div class="k" id="h-hero">Suggested infusion rate</div>
+      <button type="button" class="ratebtn" id="ratebtn" aria-haspopup="dialog" aria-label="Suggested rate. Tap to enter a rate you set yourself.">
+        <div class="big" id="rate">0</div>
+        <div class="u">mcg/kg/min</div>
+      </button>
+      <div class="sub" id="rate-sub"></div>
+      <div class="target" role="group" aria-label="Target effect-site concentration">
+        <button type="button" id="tminus" aria-label="Lower target by 0.5">−</button>
+        <div class="tbox">
+          <div class="lab"><label for="target">Target effect</label></div>
+          <input id="target" type="number" inputmode="decimal" min="0.5" max="10" step="0.1">
+          <div class="unit">mcg/mL</div>
+        </div>
+        <button type="button" id="tplus" aria-label="Raise target by 0.5">+</button>
+      </div>
+      <div class="est" id="est" aria-live="polite"></div>
+      <div class="next">
+        <div class="count" id="count"></div>
+        <div id="next" style="margin-top: 8px"></div>
+      </div>
+      <div class="bis" id="bis">
+        <div class="bisq" id="bisq" hidden>
+          <div class="bisq-t" id="bisq-t"></div>
+          <div class="bisq-r">
+            <input id="bisv" type="number" inputmode="numeric" min="0" max="100" step="1" placeholder="BIS" aria-label="BIS value">
+            <button type="button" class="btn primary" id="bissave">Save</button>
+            <button type="button" class="btn" id="bisskip">Skip</button>
+          </div>
+        </div>
+        <div class="bissug" id="bissug" hidden></div>
+        <div class="bislinks">
+          <button type="button" class="linkbtn" id="bisadd">Log a BIS value</button>
+          <button type="button" class="linkbtn" id="bislogbtn" aria-haspopup="dialog" hidden>BIS log</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top: 14px" aria-labelledby="h-ch">
+      <h2 id="h-ch">Suggested rate over time</h2>
+      <div class="legend" aria-hidden="true"><span><i class="p"></i>Earlier</span><span><i class="f"></i>From now, at this target</span><span><b class="tri">&#9650;</b>Manual bolus</span></div>
+      <div class="chart" id="chartwrap">
+        <div id="chart"></div>
+        <div class="tip" id="tip" hidden></div>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top: 14px" aria-labelledby="h-bol">
+      <h2 id="h-bol">Manual boluses</h2>
+      <div class="bform">
+        <div class="field"><label for="bmg">Dose <span class="unit">mg</span></label>
+          <div class="stepper">
+            <input id="bmg" type="number" inputmode="decimal" min="0" max="500" step="10" value="20">
+            <div class="arr"><button type="button" id="bup" aria-label="Increase dose by 10 mg">&#9650;</button><button type="button" id="bdn" aria-label="Decrease dose by 10 mg">&#9660;</button></div>
+          </div>
+        </div>
+        <div class="field"><label for="btime">Time <span class="unit" id="bhint">(now)</span></label><input id="btime" type="time"></div>
+        <div class="field"><span class="lab" aria-hidden="true">&nbsp;</span><button type="button" class="btn primary" id="badd">Add</button></div>
+      </div>
+      <div class="bsub"><button type="button" class="linkbtn" id="bclear" hidden>Back to now</button><button type="button" class="linkbtn" id="bcancel" hidden>Cancel edit</button></div>
+      <div class="msgs" id="berr" style="margin-top: 10px" aria-live="polite"></div>
+      <div class="blist" id="blist"></div>
+      <p class="caption" style="margin: 10px 0 0; font-size: 13px; color: var(--muted)">Tap the chart to pick a time, or tap a logged bolus to edit it. Each bolus lowers the suggested rate for a few minutes, and a large one can pause it, so the effect site comes back to target. Times must be after the induction start.</p>
+    </section>
+
+    <section class="notes" style="margin-top: 14px">
+      <p><button type="button" class="linkbtn" id="infobtn" aria-haspopup="dialog">How rates are worked out</button></p>
+      <p>For educational use only, not for clinical use. This tool is not a medical device and does not replace clinical judgment, your pump, or your institution's protocols. <span id="storewarn" hidden>This browser blocked saving, so a refresh will clear the case.</span></p>
+    </section>
+  </div>
+</div>
+
+<div class="overlay" id="modal" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="h-man">
+    <h2 id="h-man">Changed the rate yourself?</h2>
+    <p>Enter the rate you set to see the target effect it matches.</p>
+    <div class="mrow">
+      <label for="manual" class="unit">Rate now</label>
+      <input id="manual" type="number" inputmode="decimal" min="0" step="10" placeholder="e.g. 120">
+      <span class="unit">mcg/kg/min</span>
+    </div>
+    <div class="mres" id="mres" aria-live="polite"></div>
+    <div class="actions"><button type="button" class="btn" id="mclose">Close</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="bismodal" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="h-bislog">
+    <h2 id="h-bislog">BIS log</h2>
+    <div id="bistable"></div>
+    <p class="muted" style="margin-top:10px">Predicted BIS comes from the Eleveld model only. Treat gaps between predicted and entered BIS as a rough guide, since BIS also moves with stimulation, other drugs and artifact.</p>
+    <div class="actions"><button type="button" class="btn" id="bisclose">Close</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="info" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="h-info">
+    <h2 id="h-info">How rates are worked out</h2>
+    <p>Rates hold the target effect-site concentration once it has been reached, and are rounded to the nearest 10 mcg/kg/min.</p>
+    <p>The initial bolus is ignored, and so are any boluses given for target changes. Boluses you log in the Manual boluses section are included: each one lowers the suggested rate for a few minutes, and a large one can pause it.</p>
+    <p>Suggested rates go down over time as drug builds up in the tissues.</p>
+    <p>For educational use only, not for clinical use.</p>
+    <div class="actions"><button type="button" class="btn" id="iclose">Close</button></div>
+  </div>
+</div>
+
+<script>
+// TCI propofol engine: 3-compartment + effect site, exact 10 s discretisation.
+var TCI = (function () {
+  var DT = 10 / 60; // minutes per pump update
+
+  function matmul(A, B, n) {
+    var C = new Array(n * n).fill(0);
+    for (var i = 0; i < n; i++)
+      for (var k = 0; k < n; k++) {
+        var a = A[i * n + k];
+        if (a === 0) continue;
+        for (var j = 0; j < n; j++) C[i * n + j] += a * B[k * n + j];
+      }
+    return C;
+  }
+
+  function expm(A, n) {
+    var norm = 0;
+    for (var i = 0; i < n; i++) {
+      var s = 0;
+      for (var j = 0; j < n; j++) s += Math.abs(A[i * n + j]);
+      norm = Math.max(norm, s);
+    }
+    var sq = Math.max(0, Math.ceil(Math.log2(Math.max(norm, 1e-12))) + 2);
+    var sc = Math.pow(2, -sq);
+    var M = A.map(function (v) { return v * sc; });
+    var I = new Array(n * n).fill(0);
+    for (var d = 0; d < n; d++) I[d * n + d] = 1;
+    var R = I.slice(), T = I.slice();
+    for (var k = 1; k <= 20; k++) {
+      T = matmul(T, M, n).map(function (v) { return v / k; });
+      for (var q = 0; q < R.length; q++) R[q] += T[q];
+    }
+    for (var s2 = 0; s2 < sq; s2++) R = matmul(R, R, n);
+    return R;
+  }
+
+  function lbmJames(sex, wt, ht) {
+    var r = wt / ht;
+    return sex === 'M' ? 1.1 * wt - 128 * r * r : 1.07 * wt - 148 * r * r;
+  }
+
+  function buildModel(p) {
+    var m = {};
+    var lbm = lbmJames(p.sex, p.wt, p.ht);
+    m.lbm = lbm;
+    if (p.model === 'schnider') {
+      var V1 = 4.27, V2 = 18.9 - 0.391 * (p.age - 53), V3 = 238;
+      var Cl1 = 1.89 + 0.0456 * (p.wt - 77) - 0.0681 * (lbm - 59) + 0.0264 * (p.ht - 177);
+      var Cl2 = 1.29 - 0.024 * (p.age - 53), Cl3 = 0.836;
+      m.V1 = V1; m.V2 = V2; m.V3 = V3;
+      m.k10 = Cl1 / V1; m.k12 = Cl2 / V1; m.k21 = Cl2 / V2; m.k13 = Cl3 / V1; m.k31 = Cl3 / V3;
+      m.ke0 = 0.456;
+    } else if (p.model === 'eleveld') {
+      // Eleveld 2018 general purpose propofol model (BJA 120:942). Reference: 35 y male, 70 kg, 170 cm.
+      var sig = function (x, e50, k) { var xk = Math.pow(x, k); return xk / (xk + Math.pow(e50, k)); };
+      var ffmF = function (sex, age, wt, ht) {
+        var bmi = wt / ((ht / 100) * (ht / 100));
+        return sex === 'M'
+          ? (0.88 + (1 - 0.88) / (1 + Math.pow(age / 13.4, -12.7))) * (9270 * wt) / (6680 + 216 * bmi)
+          : (1.11 + (1 - 1.11) / (1 + Math.pow(age / 7.1, -1.1))) * (9270 * wt) / (8780 + 244 * bmi);
+      };
+      var ffmRef = ffmF('M', 35, 70, 170), ffm = ffmF(p.sex, p.age, p.wt, p.ht);
+      var op = !!p.opioid, wk = 52.1429;
+      var pma = p.age * wk + 40, pmaRef = 35 * wk + 40;
+      var V1e = 6.28 * sig(p.wt, 33.6, 1) / sig(70, 33.6, 1);
+      var V2e = 25.5 * (p.wt / 70) * Math.exp(-0.0156 * (p.age - 35));
+      var V3e = 273 * (ffm / ffmRef) * (op ? Math.exp(-0.0138 * p.age) : 1);
+      var CLe = (p.sex === 'M' ? 1.79 : 2.10) * Math.pow(p.wt / 70, 0.75) * (sig(pma, 42.3, 9.06) / sig(pmaRef, 42.3, 9.06)) * (op ? Math.exp(-0.00286 * p.age) : 1);
+      var q3m = sig(pma, 68.3, 1), q3r = sig(pmaRef, 68.3, 1);
+      var Q2e = 1.75 * Math.pow(V2e / 25.5, 0.75) * (1 + 1.3 * (1 - q3m)) / (1 + 1.3 * (1 - q3r));
+      var Q3e = 1.11 * Math.pow(V3e / 273, 0.75) * (q3m / q3r);
+      m.V1 = V1e; m.V2 = V2e; m.V3 = V3e;
+      m.k10 = CLe / V1e; m.k12 = Q2e / V1e; m.k21 = Q2e / V2e; m.k13 = Q3e / V1e; m.k31 = Q3e / V3e;
+      m.ke0 = 0.146 * Math.pow(p.wt / 70, -0.25);
+    } else {
+      m.V1 = 0.228 * p.wt; m.V2 = 0; m.V3 = 0;
+      m.k10 = 0.119; m.k12 = 0.112; m.k21 = 0.055; m.k13 = 0.0419; m.k31 = 0.0033;
+      m.V2 = m.V1 * m.k12 / m.k21; m.V3 = m.V1 * m.k13 / m.k31;
+      m.ke0 = p.ke0marsh || 1.21;
+    }
+    return m;
+  }
+
+  function discretise(m, dt) {
+    var n = 5, A = new Array(25).fill(0);
+    A[0] = -(m.k10 + m.k12 + m.k13); A[1] = m.k21; A[2] = m.k31; A[4] = 1;
+    A[5] = m.k12; A[6] = -m.k21;
+    A[10] = m.k13; A[12] = -m.k31;
+    A[15] = m.ke0 / m.V1; A[18] = -m.ke0;
+    var E = expm(A.map(function (v) { return v * dt; }), n);
+    var Phi = [], Gam = [];
+    for (var i = 0; i < 4; i++) {
+      for (var j = 0; j < 4; j++) Phi.push(E[i * 5 + j]);
+      Gam.push(E[i * 5 + 4]);
+    }
+    return { Phi: Phi, Gam: Gam };
+  }
+
+  function mulv(Phi, x) {
+    var y = [0, 0, 0, 0];
+    for (var i = 0; i < 4; i++) y[i] = Phi[i * 4] * x[0] + Phi[i * 4 + 1] * x[1] + Phi[i * 4 + 2] * x[2] + Phi[i * 4 + 3] * x[3];
+    return y;
+  }
+
+  // opts: target (ug/mL), site 'effect'|'plasma', conc (mg/mL), maxRate (mL/h), totalMin
+  function simulate(p, opts) {
+    var m = buildModel(p), D = discretise(m, DT);
+    var nSteps = Math.round(opts.totalMin / DT);
+    var Rmax = opts.maxRate * opts.conc / 60; // mg/min
+    var H = 90;
+    // G_k = Ce contribution of a unit rate in step 0, observed at end of step k (k>=1)
+    var G = [], v = D.Gam.slice();
+    for (var k = 1; k <= H; k++) { G.push(v[3]); v = mulv(D.Phi, v); }
+    var x = opts.x0 ? opts.x0.slice() : [0, 0, 0, 0];
+    var out = { t: [0], Cp: [x[0] / m.V1], Ce: [x[3]], R: [], m: m, dt: DT };
+    for (var s = 0; s < nSteps; s++) {
+      var R;
+      var px = mulv(D.Phi, x);
+      if (opts.site === 'plasma') {
+        R = (opts.target * m.V1 - px[0]) / D.Gam[0];
+      } else {
+        R = Infinity;
+        var f = x.slice();
+        for (var k2 = 1; k2 <= H; k2++) {
+          f = mulv(D.Phi, f);
+          if (k2 === 1) f = px; // f already advanced one step without input
+          var g = G[k2 - 1];
+          if (g > 1e-12) R = Math.min(R, (opts.target - f[3]) / g);
+        }
+      }
+      if (!isFinite(R) || R < 0) R = 0;
+      if (R > Rmax) R = Rmax;
+      out.R.push(R);
+      for (var i = 0; i < 4; i++) x[i] = px[i] + D.Gam[i] * R;
+      out.t.push((s + 1) * DT);
+      out.Cp.push(x[0] / m.V1);
+      out.Ce.push(x[3]);
+    }
+    return out;
+  }
+
+  function summarise(sim, opts, wt, edges) {
+    var R = sim.R, dt = sim.dt, n = R.length;
+    // loading phase: until rate first collapses
+    var bi = 1;
+    while (bi < n && !(R[bi] < 0.25 * R[bi - 1])) bi++;
+    var found = bi < n;
+    if (!found) bi = opts.primed ? 0 : Math.min(1, n);
+    var bolusMg = 0;
+    for (var i = 0; i < bi; i++) bolusMg += R[i] * dt;
+    if (opts.primed && bolusMg < 5) { bi = 0; bolusMg = 0; }
+    var bolusMin = bi * dt;
+    var cum = [0];
+    for (var j = 0; j < n; j++) cum.push(cum[j] + R[j] * dt);
+    var rows = [];
+    for (var e = 0; e < edges.length - 1; e++) {
+      var a = Math.round(edges[e] / dt), b = Math.min(n, Math.round(edges[e + 1] / dt));
+      if (a >= n) break;
+      var doseAll = cum[b] - cum[a];
+      var bolusIn = Math.max(0, Math.min(b, bi) - a);
+      var doseBolus = 0;
+      for (var q = a; q < a + bolusIn; q++) doseBolus += R[q] * dt;
+      var dose = doseAll - doseBolus;
+      var durFree = (b - a - bolusIn) * dt;
+      var rate = durFree > 1e-9 ? dose / durFree : 0; // mg/min
+      rows.push({
+        t0: a * dt, t1: b * dt, dose: dose, doseAll: doseAll,
+        mgmin: rate, mlh: rate * 60 / opts.conc, mgkgh: rate * 60 / wt,
+        cum: cum[b], Cp: sim.Cp[b], Ce: sim.Ce[b], bolusIn: bolusIn * dt
+      });
+    }
+    var thr = 0.97 * opts.target, tReach = null, pk = 0, tPk = 0;
+    for (var z = 0; z < sim.Ce.length; z++) {
+      if (tReach === null && sim.Ce[z] >= thr) tReach = sim.t[z];
+      if (sim.Ce[z] > pk) { pk = sim.Ce[z]; tPk = sim.t[z]; }
+    }
+    return { rows: rows, bolusMg: bolusMg, bolusMin: bolusMin, tReach: tReach, peakCe: pk, tPeak: tPk, total: cum[n] };
+  }
+
+  // Replay what has already been given. hist: { bolusMg, segs: [{ mgmin, min }] }
+  function prime(p, hist) {
+    var m = buildModel(p), Df = discretise(m, DT);
+    var x = [hist.bolusMg, 0, 0, 0], elapsed = 0, i;
+    hist.segs.forEach(function (s) { elapsed += s.min; });
+    var t = -elapsed, out = { t: [t], Cp: [x[0] / m.V1], Ce: [0], elapsed: elapsed, total: hist.bolusMg, segs: [] };
+    hist.segs.forEach(function (s) {
+      var rem = s.min, t0 = t;
+      while (rem > 1e-9) {
+        var d = Math.min(DT, rem), D = d === DT ? Df : discretise(m, d), px = mulv(D.Phi, x);
+        for (i = 0; i < 4; i++) x[i] = px[i] + D.Gam[i] * s.mgmin;
+        rem -= d; t += d;
+        out.t.push(Math.min(0, t)); out.Cp.push(x[0] / m.V1); out.Ce.push(x[3]);
+      }
+      out.total += s.mgmin * s.min;
+      out.segs.push({ t0: t0, t1: Math.min(0, t), mgmin: s.mgmin });
+    });
+    out.t[out.t.length - 1] = 0;
+    out.x = x; out.m = m;
+    return out;
+  }
+
+  return { discretise: discretise, mulv: mulv, prime: prime, simulate: simulate, summarise: summarise, buildModel: buildModel, lbmJames: lbmJames, DT: DT };
+})();
+
+
+</script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var KEY = 'tciPropofolCase.v1', MAXMIN = 600;
+  var DEFAULT_PT = { sex: 'M', age: 50, wt: 70, ht: 170, model: 'schnider', opioid: true };
+  var MODEL_NAMES = { schnider: 'Schnider', marsh: 'Marsh', eleveld: 'Eleveld' };
+  var C = null;            // current case
+  var ui = { committed: false, editing: true, resumePending: false };
+  var storeOk = true;
+  var prof = { key: null, r1: null };
+
+  /* ---------- helpers ---------- */
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function clock(ms) { var d = new Date(ms); return pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+  function dayPrefix(ms) {
+    var d = new Date(ms), n = new Date();
+    if (d.toDateString() === n.toDateString()) return '';
+    return d.toLocaleDateString(undefined, { weekday: 'short' }) + ' ';
+  }
+  function dur(min) {
+    min = Math.round(min);
+    if (min < 60) return min + ' min';
+    var h = Math.floor(min / 60), m = min % 60;
+    return h + ' h' + (m ? ' ' + m + ' min' : '');
+  }
+  function f1(v) { return (Math.round(v * 10) / 10).toFixed(1); }
+  function round10(v) { return Math.max(0, Math.round(v / 10) * 10); }
+  function resolveStart(hhmm) {
+    var p = hhmm.split(':'), d = new Date();
+    d.setHours(parseInt(p[0], 10), parseInt(p[1], 10), 0, 0);
+    var ms = d.getTime();
+    if (ms > Date.now() + 60000) ms -= 86400000;
+    return ms;
+  }
+  function newCase() {
+    var now = Math.floor(Date.now() / 60000) * 60000;
+    return { patient: JSON.parse(JSON.stringify(DEFAULT_PT)), startMs: now, targets: [{ atMs: now, target: 3.5 }], boluses: [], sel: null, bis: [], bisCue: 0 };
+  }
+  function validCase(o) {
+    try {
+      var p = o.patient;
+      return o && p && (p.sex === 'M' || p.sex === 'F') && p.age >= 18 && p.age <= 100 && p.wt >= 30 && p.wt <= 250 && p.ht >= 120 && p.ht <= 220 &&
+        MODEL_NAMES[p.model] && isFinite(o.startMs) && Array.isArray(o.targets) && o.targets.length > 0 &&
+        o.targets.every(function (t) { return isFinite(t.atMs) && t.target >= 0.5 && t.target <= 10; });
+    } catch (e) { return false; }
+  }
+  function save() {
+    if (!ui.committed) return;
+    try { localStorage.setItem(KEY, JSON.stringify(C)); } catch (e) { storeOk = false; $('storewarn').hidden = false; }
+  }
+  function load() {
+    try { var s = localStorage.getItem(KEY); if (!s) return null; var o = JSON.parse(s); if (!validCase(o)) return null; o.sel = isFinite(o.sel) && o.sel !== null ? o.sel : null; o.bis = Array.isArray(o.bis) ? o.bis.filter(function (b) { return isFinite(b.atMs) && b.v >= 0 && b.v <= 100; }) : []; o.bisCue = isFinite(o.bisCue) ? o.bisCue : 0; o.boluses = Array.isArray(o.boluses) ? o.boluses.filter(function (b) { return isFinite(b.atMs) && b.mg > 0 && b.mg <= 500; }) : []; return o; }
+    catch (e) { return null; }
+  }
+  function wipe() { try { localStorage.removeItem(KEY); } catch (e) {} }
+  function curTarget() { return C.targets[C.targets.length - 1].target; }
+  function targetAt(ms) {
+    var r = C.targets[0].target;
+    for (var i = 0; i < C.targets.length; i++) if (C.targets[i].atMs <= ms) r = C.targets[i].target;
+    return r;
+  }
+  function elapsedMin() { return Math.max(0, (Date.now() - C.startMs) / 60000); }
+  function ptText(p) { return (p.sex === 'M' ? 'Male' : 'Female') + ', ' + p.age + ' y, ' + p.wt + ' kg, ' + p.ht + ' cm, ' + MODEL_NAMES[p.model] + (p.model === 'eleveld' ? (p.opioid ? ', with opioid' : ', no opioid') : ''); }
+
+  /* ---------- pharmacology ---------- */
+  // Rate (mcg/kg/min) that holds 1 mcg/mL since the start, bolus ignored. Scales linearly with target.
+  function profile() {
+    var P = C.patient, key = [P.sex, P.age, P.wt, P.ht, P.model, P.opioid ? 1 : 0].join('|');
+    if (prof.key === key) return prof.r1;
+    var p = { sex: P.sex, age: P.age, wt: P.wt, ht: P.ht, model: P.model, opioid: !!P.opioid, ke0marsh: 1.21 };
+    var m = TCI.buildModel(p);
+    if (!(m.k10 > 0 && m.V1 > 0 && m.V2 > 0 && m.k21 > 0)) { prof = { key: key, r1: null }; return null; }
+    var sim = TCI.simulate(p, { target: 1, site: 'plasma', conc: 10, maxRate: 1e9, totalMin: MAXMIN, x0: [m.V1, 0, 0, 0] });
+    prof = { key: key, r1: sim.R.map(function (R) { return R * 1000 / P.wt; }), m: m, D: TCI.discretise(m, TCI.DT) };
+    return prof.r1;
+  }
+  // Recommended rate (mcg/kg/min, unrounded) at every 10 s step: the target schedule, reduced after boluses so that the
+  // effect site returns to target within HORIZON minutes. A second pass follows the rounded rates to estimate Ce and Cp.
+  var SER = null, HORIZON = 5;
+  function buildSeries() {
+    var r1 = profile(); if (!r1) return null;
+    var D = prof.D, m = prof.m, P = C.patient, N = r1.length, H = Math.round(HORIZON / TCI.DT);
+    if (!prof.G) { var gx = [0, 0, 0, 0]; for (var j = 0; j < H; j++) { var gp = TCI.mulv(D.Phi, gx); for (var q = 0; q < 4; q++) gx[q] = gp[q] + D.Gam[q]; } prof.G = gx[3]; }
+    var rate = new Array(N), ce = new Array(N), cp = new Array(N), y = [0, 0, 0, 0], bi = 0, c0 = C.targets[0].target;
+    var x = [m.V1 * c0, 0, 0, c0];
+    var bol = (C.boluses || []).slice().sort(function (a, b) { return a.atMs - b.atMs; });
+    for (var k = 0; k < N; k++) {
+      var tms = C.startMs + k * TCI.DT * 60000, tEnd = tms + TCI.DT * 60000;
+      while (bi < bol.length && bol[bi].atMs < tEnd) { if (bol[bi].atMs >= C.startMs) { y[0] += bol[bi].mg; x[0] += bol[bi].mg; } bi++; }
+      var base = targetAt(tms) * r1[k] * P.wt / 1000;
+      var f = y.slice(); for (var s = 0; s < H; s++) f = TCI.mulv(D.Phi, f);
+      var adj = -f[3] / prof.G;
+      if (adj < -base) adj = -base;
+      if (adj > 0) adj = 0;
+      var tot = (base + adj) * 1000 / P.wt;
+      rate[k] = tot; ce[k] = x[3]; cp[k] = x[0] / m.V1;
+      var py = TCI.mulv(D.Phi, y), px = TCI.mulv(D.Phi, x), used = round10(tot) * P.wt / 1000;
+      for (var i = 0; i < 4; i++) { y[i] = py[i] + D.Gam[i] * adj; x[i] = px[i] + D.Gam[i] * used; }
+    }
+    return { rate: rate, ce: ce, cp: cp };
+  }
+  var shownRate = null;
+  function setRate(n) {
+    var el = $('rate'), s = String(n);
+    if (shownRate === s) return;
+    var prev = shownRate, first = prev === null;
+    shownRate = s;
+    var sameLen = !first && prev.length === s.length;
+    el.innerHTML = '';
+    var strips = [];
+    for (var i = 0; i < s.length; i++) {
+      var d = +s.charAt(i);
+      var dg = document.createElement('span'); dg.className = 'dg'; dg.setAttribute('aria-hidden', 'true');
+      var st = document.createElement('span'); st.className = 'strip';
+      for (var k = 0; k < 10; k++) { var sp = document.createElement('span'); sp.textContent = k; st.appendChild(sp); }
+      var from = first ? d : (sameLen ? +prev.charAt(i) : 0);
+      st.style.transform = 'translateY(' + (-from) + 'em)';
+      dg.appendChild(st); el.appendChild(dg);
+      strips.push([st, d, i]);
+    }
+    var sr = document.createElement('span'); sr.className = 'sr'; sr.textContent = s;
+    sr.style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)';
+    el.appendChild(sr);
+    if (first) return;
+    void el.offsetWidth;
+    strips.forEach(function (x) {
+      x[0].style.transitionDelay = (x[2] * 70) + 'ms';
+      x[0].style.transform = 'translateY(' + (-x[1]) + 'em)';
+    });
+    var down = +s < +prev;
+    el.classList.remove('pop', 'dn'); void el.offsetWidth;
+    el.classList.add('pop'); if (down) el.classList.add('dn');
+  }
+  function serIdx(tMin) { return Math.min(SER.rate.length - 1, Math.max(0, Math.floor(tMin / TCI.DT))); }
+  function serAt(tMin) { return SER.rate[serIdx(tMin)]; }
+  function unitRate(tMin) {
+    var r1 = profile(); if (!r1) return 0;
+    var k = Math.min(r1.length - 1, Math.max(0, Math.floor(tMin / TCI.DT)));
+    return r1[k];
+  }
+
+  /* ---------- screens ---------- */
+  function showScreens() {
+    $('resume').hidden = !ui.resumePending;
+    var show = !ui.resumePending;
+    $('setup').hidden = !(show && ui.editing);
+    $('casebar').hidden = !(show && ui.committed && !ui.editing);
+    $('main').hidden = !(show && ui.committed);
+    $('t0-field').hidden = ui.committed;
+    $('done').textContent = ui.committed ? 'Done' : 'Start case';
+  }
+  function fillForm() {
+    var P = C.patient;
+    $('age').value = P.age; $('wt').value = P.wt; $('ht').value = P.ht; $('model').value = P.model; $('opioid').checked = P.opioid !== false; $('opioid-field').hidden = P.model !== 'eleveld';
+    $('start').value = clock(C.startMs); $('t0').value = C.targets[0].target;
+    $('seg-sex').querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-v') === P.sex)); });
+  }
+  function readForm() {
+    var errs = [], P = {};
+    P.sex = C.patient.sex; P.model = $('model').value; P.opioid = $('opioid').checked; $('opioid-field').hidden = P.model !== 'eleveld';
+    P.age = parseFloat($('age').value); P.wt = parseFloat($('wt').value); P.ht = parseFloat($('ht').value);
+    var rules = [['age', 18, 100, 'Age must be 18 to 100 years.'], ['wt', 30, 250, 'Weight must be 30 to 250 kg.'], ['ht', 120, 220, 'Height must be 120 to 220 cm.']];
+    rules.forEach(function (r) {
+      var ok = P[r[0]] >= r[1] && P[r[0]] <= r[2];
+      $(r[0]).setAttribute('aria-invalid', String(!ok)); if (!ok) errs.push(r[3]);
+    });
+    var startOk = /^\d{1,2}:\d{2}$/.test($('start').value);
+    $('start').setAttribute('aria-invalid', String(!startOk)); if (!startOk) errs.push('Enter the induction start time.');
+    var t0 = parseFloat($('t0').value), t0ok = ui.committed || (t0 >= 0.5 && t0 <= 10);
+    $('t0').setAttribute('aria-invalid', String(!t0ok)); if (!t0ok) errs.push('Target must be 0.5 to 10 mcg/mL.');
+    $('ferr').innerHTML = errs.map(function (e) { return '<div class="msg err">' + e + '</div>'; }).join('');
+    return errs.length ? null : { P: P, t0: t0 };
+  }
+  function applyForm() {
+    var r = readForm();
+    if (!r) { $('main').classList.add('stale'); return false; }
+    $('main').classList.remove('stale');
+    C.patient = r.P;
+    C.startMs = resolveStart($('start').value);
+    C.targets[0].atMs = C.startMs;
+    if (!ui.committed) C.targets = [{ atMs: C.startMs, target: Math.round(r.t0 * 10) / 10 }];
+    save(); render();
+    return true;
+  }
+
+  /* ---------- render ---------- */
+  function warnings() {
+    var P = C.patient, w = [], bmi = P.wt / Math.pow(P.ht / 100, 2);
+    if (P.model === 'schnider' && (P.age < 25 || P.age > 81 || P.wt < 44 || P.wt > 123 || P.ht < 155 || P.ht > 196))
+      w.push('These values are outside the range the Schnider model was built on (age 25 to 81, weight 44 to 123 kg, height 155 to 196 cm).');
+    if (bmi >= 35) w.push('BMI is ' + bmi.toFixed(0) + '. ' + (P.model === 'eleveld' ? 'Eleveld accounts for body composition, but check local practice.' : 'This model uses total body weight, so many teams adjust the weight in obesity. Check local practice.'));
+    if (elapsedMin() > 720) w.push('This case started more than 12 hours ago. Reset if this is a new patient.');
+    return w;
+  }
+  function render() {
+    if (!ui.committed || !C) return;
+    var r1 = profile();
+    if (!r1) {
+      $('warn').innerHTML = '<div class="msg err">These demographics give an invalid model parameter set. Check age, weight and height.</div>';
+      return;
+    }
+    $('warn').innerHTML = warnings().map(function (m) { return '<div class="msg">' + m + '</div>'; }).join('');
+    SER = buildSeries();
+    var el = elapsedMin(), tg = curTarget(), rate = round10(serAt(el)), ceNow = SER.ce[serIdx(el)];
+    $('casesum').innerHTML = '<b>' + ptText(C.patient) + '</b><br><span>Started ' + dayPrefix(C.startMs) + clock(C.startMs) + ', ' + dur(el) + ' ago</span>';
+    setRate(rate);
+    var hasB = (C.boluses || []).some(function (b) { return b.atMs >= C.startMs; });
+    $('rate-sub').textContent = hasB && rate === 0 ? 'Paused while the bolus drug redistributes' : '';
+    var dce = Math.round((ceNow - tg) * 10) / 10;
+    $('est').innerHTML = 'Estimated effect site now <b>' + f1(ceNow) + '</b> mcg/mL' + (Math.abs(dce) >= 0.1 ? ' <span class="d">(' + f1(Math.abs(dce)) + ' ' + (dce > 0 ? 'above' : 'below') + ' target)</span>' : '');
+    var i0 = serIdx(el), pk = ceNow, pki = i0, kk;
+    for (kk = i0; kk < Math.min(SER.ce.length, i0 + Math.round(10 / TCI.DT)); kk++) if (SER.ce[kk] > pk) { pk = SER.ce[kk]; pki = kk; }
+    if (pk - ceNow >= 0.15) $('est').innerHTML += '<br><span class="d">Rising to about ' + f1(pk) + ' by ' + clock(C.startMs + pki * TCI.DT * 60000) + '</span>';
+    if (isEleveld()) $('est').innerHTML += '<br>Expected BIS: <b>' + Math.round(predBIS(ceNow, C.patient.age)) + '</b>';
+    if (document.activeElement !== $('target')) $('target').value = f1(tg);
+    // upcoming steps (10 s resolution, matching the model steps)
+    var ch = [], prev = rate, hmax = Math.min(MAXMIN, el + 240);
+    for (var t = el; t <= hmax && ch.length < 3; t += TCI.DT) {
+      var v = round10(serAt(t));
+      if (v !== prev) { ch.push({ t: t, v: v }); prev = v; }
+    }
+    nextChange = ch.length ? { ms: C.startMs + ch[0].t * 60000, v: ch[0].v } : null;
+    $('next').innerHTML = ch.length
+      ? 'Then' + ch.slice(1).map(function (c, i) { return (i ? ', ' : ' ') + '<b>' + c.v + '</b> at ' + clock(C.startMs + c.t * 60000); }).join('') + (ch.length > 1 ? '.' : ' nothing further in the next 4 hours.')
+      : '';
+    renderBis(el);
+    tickCount();
+    renderManual();
+    renderBoluses();
+    draw();
+  }
+  function renderManual() {
+    var v = parseFloat($('manual').value), box = $('mres');
+    if (!(v >= 0)) { box.innerHTML = '<span class="hint">Enter the rate you set to see the target effect it matches.</span>'; return; }
+    var u = unitRate(elapsedMin());
+    if (!(u > 0)) { box.innerHTML = '<span class="hint">No estimate available.</span>'; return; }
+    var eq = v / u, eqr = Math.round(eq * 10) / 10, tg = curTarget(), diff = Math.round((eqr - tg) * 10) / 10;
+    var out = eqr > 10 || eqr < 0.5;
+    box.innerHTML = 'Matches a target effect of <b>' + f1(eq) + '</b> mcg/mL' +
+      (Math.abs(diff) < 0.05 ? ' (same as your target).' : ' (' + f1(Math.abs(diff)) + ' ' + (diff > 0 ? 'above' : 'below') + ' your target).') +
+      (out ? '' : ' <button type="button" class="btn small" id="usemanual" style="margin-left: 6px">Use ' + f1(eqr) + ' as target</button>');
+  }
+
+  /* ---------- chart ---------- */
+  var ML = 44, MR = 14, MT = 16, MB = 30, chartState = null;
+  function niceTicks(max, n) {
+    var raw = max / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / mag;
+    var step = (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * mag;
+    var top = Math.ceil(max / step - 1e-9) * step, t = [];
+    for (var v = 0; v <= top + 1e-9; v += step) t.push(+v.toFixed(6));
+    return { ticks: t, top: top };
+  }
+  function draw() {
+    if (!ui.committed || !C || !profile()) return;
+    var W = Math.max(280, Math.floor($('chart').clientWidth)); if (!W) return;
+    var el = elapsedMin(), tg = curTarget();
+    var tmax = Math.min(MAXMIN, Math.max(120, Math.ceil((el + 90) / 30) * 30));
+    var H = 300, pw = W - ML - MR, ph = H - MT - MB;
+    var xs = function (t) { return ML + (t / tmax) * pw; };
+    var STEP = 0.25, past = [], fut = [], t, vmax = 10;
+    if (!SER) SER = buildSeries();
+    for (t = 0; t < el; t += STEP) { var pv = round10(serAt(t)); past.push({ t: t, v: pv }); vmax = Math.max(vmax, pv); }
+    var nowV = round10(serAt(el));
+    past.push({ t: el, v: nowV });
+    for (t = el; t <= tmax + 1e-9; t += STEP) { var fv = round10(serAt(t)); fut.push({ t: t, v: fv }); vmax = Math.max(vmax, fv); }
+    fut[0].v = nowV;
+    var nt = niceTicks(vmax * 1.12, 4);
+    var ys = function (v) { return MT + ph - (v / nt.top) * ph; };
+    var g = '';
+    nt.ticks.forEach(function (v) {
+      g += '<line x1="' + ML + '" x2="' + (W - MR) + '" y1="' + ys(v) + '" y2="' + ys(v) + '" stroke="var(--line)"' + (v === 0 ? '' : ' opacity="0.7"') + '/>';
+      g += '<text class="ax" x="' + (ML - 6) + '" y="' + (ys(v) + 4) + '" text-anchor="end">' + v + '</text>';
+    });
+    g += '<text class="axl" x="' + (W - MR) + '" y="' + (MT - 5) + '" text-anchor="end">mcg/kg/min</text>';
+    var st = tmax <= 180 ? 30 : 60;
+    if (W < 460 && st === 30) st = 60;
+    for (var tk = 0; tk <= tmax; tk += st) {
+      g += '<line x1="' + xs(tk) + '" x2="' + xs(tk) + '" y1="' + (H - MB) + '" y2="' + (H - MB + 4) + '" stroke="var(--line)"/>';
+      g += '<text class="ax" x="' + xs(tk) + '" y="' + (H - 12) + '" text-anchor="middle">' + clock(C.startMs + tk * 60000) + '</text>';
+    }
+    var stepPath = function (pts) {
+      var d = '', prev = null;
+      pts.forEach(function (p, i) {
+        if (i === 0) { d += 'M' + xs(p.t).toFixed(1) + ',' + ys(p.v).toFixed(1); prev = p.v; return; }
+        if (p.v !== prev) { d += 'H' + xs(p.t).toFixed(1) + 'V' + ys(p.v).toFixed(1); prev = p.v; }
+      });
+      return d + 'H' + xs(pts[pts.length - 1].t).toFixed(1);
+    };
+    if (past.length > 1) g += '<path d="' + stepPath(past) + '" fill="none" stroke="var(--past)" stroke-width="2" stroke-linejoin="round"/>';
+    g += '<path d="' + stepPath(fut) + '" fill="none" stroke="var(--accent)" stroke-width="3.5" stroke-linejoin="round"/>';
+    // labels at each future step
+    var lastX = -100, labelPts = [{ t: el, v: nowV }], pv2 = nowV;
+    fut.forEach(function (p) { if (p.v !== pv2) { labelPts.push(p); pv2 = p.v; } });
+    labelPts.forEach(function (p) {
+      var x = xs(p.t);
+      if (x - lastX < 38) return;
+      lastX = x;
+      g += '<text class="lbl" x="' + Math.min(W - MR - 10, x + 4) + '" y="' + (ys(p.v) - 7) + '">' + p.v + '</text>';
+    });
+    g += '<line x1="' + xs(el) + '" x2="' + xs(el) + '" y1="' + MT + '" y2="' + (H - MB) + '" stroke="var(--ink2)" stroke-width="1.5" stroke-dasharray="4 3"/>';
+    g += '<circle cx="' + xs(el) + '" cy="' + ys(nowV) + '" r="5.5" fill="var(--accent)" stroke="var(--surface)" stroke-width="2.5"/>';
+    g += '<text class="axl" x="' + (xs(el) + (xs(el) > W - 60 ? -6 : 6)) + '" y="' + (H - MB - 6) + '" text-anchor="' + (xs(el) > W - 60 ? 'end' : 'start') + '" fill="var(--ink2)" style="fill: var(--ink2)">now</text>';
+    var lastB = -100;
+    (C.boluses || []).forEach(function (b) {
+      var bt = (b.atMs - C.startMs) / 60000;
+      if (bt < 0 || bt > tmax) return;
+      var bx = xs(bt), by = H - MB;
+      g += '<line x1="' + bx + '" x2="' + bx + '" y1="' + MT + '" y2="' + by + '" stroke="var(--bolus)" stroke-width="1" stroke-dasharray="1 3" opacity="0.8"/>';
+      g += '<path d="M' + (bx - 6) + ',' + by + 'L' + (bx + 6) + ',' + by + 'L' + bx + ',' + (by - 11) + 'Z" fill="var(--bolus)"/>';
+      if (bx - lastB >= 30) { g += '<text class="lblb" x="' + bx + '" y="' + (by - 15) + '" text-anchor="middle">' + Math.round(b.mg) + '</text>'; lastB = bx; }
+    });
+    if (C.sel) {
+      var st2 = (C.sel - C.startMs) / 60000;
+      if (st2 >= 0 && st2 <= tmax) {
+        var sx = xs(st2), lab = clock(C.sel), pwid = 50, px0 = Math.min(W - pwid - 2, Math.max(2, sx - pwid / 2));
+        g += '<line x1="' + sx + '" x2="' + sx + '" y1="14" y2="' + (H - MB) + '" stroke="var(--ink)" stroke-width="2"/>';
+        g += '<rect x="' + px0 + '" y="0" width="' + pwid + '" height="18" rx="9" fill="var(--ink)"/>';
+        g += '<text x="' + (px0 + pwid / 2) + '" y="13" text-anchor="middle" style="font: 600 11.5px var(--font-num); fill: var(--bg)">' + lab + '</text>';
+      }
+    }
+    g += '<line id="xh" y1="' + MT + '" y2="' + (H - MB) + '" stroke="var(--ink2)" stroke-width="1" visibility="hidden"/>';
+    $('chart').innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" role="img" aria-label="Suggested infusion rate in mcg/kg/min over time, in steps of 10. The current rate and next steps are listed above the chart.">' + g + '</svg>';
+    chartState = { xs: xs, tmax: tmax, el: el, tg: tg, W: W };
+  }
+  var wrapEl = $('chartwrap'), tip = $('tip');
+  function hideTip() { tip.hidden = true; var x = $('xh'); if (x) x.setAttribute('visibility', 'hidden'); }
+  wrapEl.addEventListener('pointermove', function (ev) {
+    if (!chartState) return;
+    var svg = $('chart').querySelector('svg'); if (!svg) return;
+    var rect = svg.getBoundingClientRect(), x = ev.clientX - rect.left;
+    if (x < ML || x > rect.width - MR) { hideTip(); return; }
+    var s = chartState, t = (x - ML) / (rect.width - ML - MR) * s.tmax;
+    var tg = t < s.el ? targetAt(C.startMs + t * 60000) : s.tg;
+    var v = round10(serAt(t));
+    var xh = $('xh'); xh.setAttribute('x1', s.xs(t)); xh.setAttribute('x2', s.xs(t)); xh.setAttribute('visibility', 'visible');
+    tip.innerHTML = '<b>' + dayPrefix(C.startMs + t * 60000) + clock(C.startMs + t * 60000) + '</b> (' + dur(t) + ')<br>' + v + ' mcg/kg/min<br>target ' + f1(tg);
+    tip.hidden = false;
+    var wr = wrapEl.getBoundingClientRect(), tw = tip.offsetWidth, left = ev.clientX - wr.left + 14;
+    if (left + tw > wr.width) left = ev.clientX - wr.left - tw - 14;
+    tip.style.left = Math.max(0, left) + 'px'; tip.style.top = (-tip.offsetHeight - 8) + 'px';
+  });
+  wrapEl.addEventListener('pointerleave', hideTip);
+
+  /* ---------- target ---------- */
+  /* ---------- BIS feedback ---------- */
+  // Eleveld 2018 PD: BIS = 93 * (1 - Ce^g / (Ce^g + Ce50^g)), Ce50 = 3.08 * exp(-0.00635 * (age - 35)),
+  // g = 1.89 at or below Ce50, 1.47 above.
+  function predBIS(ce, age) {
+    var ce50 = 3.08 * Math.exp(-0.00635 * (age - 35)), g = ce <= ce50 ? 1.89 : 1.47;
+    var x = Math.pow(Math.max(ce, 0), g);
+    return 93 * (1 - x / (x + Math.pow(ce50, g)));
+  }
+  function isEleveld() { return C.patient.model === 'eleveld'; }
+  var bisManual = false, bisDrop = null;
+  function lastDrop(el) {
+    // most recent step down in the suggested rate within the last 15 min
+    var prev = round10(serAt(Math.max(0, el - 15))), found = null;
+    for (var t = Math.max(0, el - 15) + TCI.DT; t <= el; t += TCI.DT) {
+      var v = round10(serAt(t));
+      if (v < prev) found = { ms: C.startMs + t * 60000, v: v };
+      prev = v;
+    }
+    return found;
+  }
+  function renderBis(el) {
+    $('bis').hidden = !isEleveld();
+    if (!isEleveld()) { bisManual = false; bisDrop = null; return; }
+    var now = Date.now(), d = lastDrop(el);
+    bisDrop = d && d.ms > (C.bisCue || 0) ? d : null;
+    var show = bisManual || !!bisDrop;
+    var wasHidden = $('bisq').hidden;
+    $('bisq').hidden = !show;
+    if (show) {
+      $('bisq-t').textContent = bisManual && !bisDrop ? 'BIS now?' : 'Rate dropped to ' + bisDrop.v + ' at ' + clock(bisDrop.ms) + '. BIS?';
+      if (wasHidden) $('bisv').value = '';
+    }
+    $('bisadd').hidden = show;
+    var nb = (C.bis || []).length;
+    $('bislogbtn').hidden = !nb;
+    $('bislogbtn').textContent = 'BIS log (' + nb + ')';
+    var last = (C.bis || [])[(C.bis || []).length - 1];
+    var sug = $('bissug');
+    if (last && now - last.atMs < 10 * 60000 && last.dismissed !== true && !show) {
+      var tg = curTarget(), msg, to = null;
+      if (last.v < 40) { to = Math.max(0.5, Math.round((tg - 0.5) * 10) / 10); msg = 'BIS ' + last.v + ' is below 40. You could lower the target to ' + f1(to) + '.'; }
+      else if (last.v > 60) { to = Math.min(10, Math.round((tg + 0.5) * 10) / 10); msg = 'BIS ' + last.v + ' is above 60. You could raise the target to ' + f1(to) + '.'; }
+      else msg = 'BIS ' + last.v + ' is in the 40 to 60 range. No target change suggested.';
+      sug.innerHTML = msg + (to !== null && to !== tg ? '<br><button type="button" class="btn" id="bisapply" data-to="' + to + '">Set target to ' + f1(to) + '</button> ' : '') + ' <button type="button" class="linkbtn" id="bisdone">Dismiss</button>';
+      sug.hidden = false;
+    } else sug.hidden = true;
+  }
+  function bisSave() {
+    var v = parseFloat($('bisv').value);
+    if (!(v >= 0 && v <= 100)) { $('bisv').focus(); return; }
+    var now = Date.now(), el = elapsedMin();
+    var ce = SER && SER.ce ? SER.ce[serIdx(el)] : 0;
+    var ent = { atMs: now, v: Math.round(v), ce: ce, tg: curTarget() };
+    if (isEleveld()) ent.pred = Math.round(predBIS(ce, C.patient.age));
+    C.bis = (C.bis || []).concat([ent]).slice(-50);
+    if (bisDrop) C.bisCue = bisDrop.ms;
+    bisManual = false; save(); render();
+  }
+  function bisSkip() { if (bisDrop) C.bisCue = bisDrop.ms; bisManual = false; save(); render(); }
+  $('bissave').addEventListener('click', bisSave);
+  $('bisskip').addEventListener('click', bisSkip);
+  $('bisadd').addEventListener('click', function () { bisManual = true; render(); $('bisv').focus(); });
+  $('bisv').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); bisSave(); } });
+  $('bissug').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    var last = C.bis[C.bis.length - 1];
+    if (b.id === 'bisapply') { last.dismissed = true; setTarget(parseFloat(b.getAttribute('data-to'))); }
+    else if (b.id === 'bisdone') { last.dismissed = true; save(); render(); }
+  });
+
+  var bm = $('bismodal');
+  function openBisLog() {
+    var rows = (C.bis || []).slice().reverse();
+    var el = isEleveld();
+    $('bistable').innerHTML = '<table class="bistab"><thead><tr><th>Time</th><th>BIS</th>' + (el ? '<th>Predicted</th>' : '') + '<th>Est. Ce</th><th>Target</th></tr></thead><tbody>' +
+      rows.map(function (b) {
+        return '<tr><td>' + clock(b.atMs) + '</td><td><b>' + b.v + '</b></td>' + (el ? '<td>' + (b.pred !== undefined ? b.pred : '') + '</td>' : '') + '<td>' + f1(b.ce) + '</td><td>' + f1(b.tg) + '</td></tr>';
+      }).join('') + '</tbody></table>';
+    bm.hidden = false; setTimeout(function () { $('bisclose').focus(); }, 30);
+  }
+  function closeBisLog() { bm.hidden = true; $('bislogbtn').focus(); }
+  $('bislogbtn').addEventListener('click', openBisLog);
+  $('bisclose').addEventListener('click', closeBisLog);
+  bm.addEventListener('click', function (e) { if (e.target === bm) closeBisLog(); });
+  document.addEventListener('keydown', function (e) {
+    if (bm.hidden) return;
+    if (e.key === 'Escape') closeBisLog(); else if (e.key === 'Tab') { e.preventDefault(); $('bisclose').focus(); }
+  });
+
+  function setTarget(v) {
+    v = Math.min(10, Math.max(0.5, Math.round(v * 10) / 10));
+    if (!isFinite(v) || v === curTarget()) { $('target').value = f1(curTarget()); return; }
+    var now = Date.now(), last = C.targets[C.targets.length - 1];
+    if (C.targets.length === 1 && now - C.startMs < 60000) last.target = v;
+    else if (C.targets.length > 1 && now - last.atMs < 30000) last.target = v;
+    else C.targets.push({ atMs: now, target: v });
+    save(); render();
+  }
+
+  /* ---------- events ---------- */
+  $('seg-sex').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    C.patient.sex = b.getAttribute('data-v'); fillForm(); applyForm();
+  });
+  ['age', 'wt', 'ht', 'start', 't0'].forEach(function (id) { $(id).addEventListener('input', applyForm); });
+  $('model').addEventListener('change', applyForm);
+  $('opioid').addEventListener('change', applyForm);
+  $('startnow').addEventListener('click', function () { $('start').value = clock(Date.now()); applyForm(); });
+  $('done').addEventListener('click', function () {
+    if (!applyForm()) return;
+    ui.committed = true; ui.editing = false; save(); showScreens(); render();
+  });
+  $('edit').addEventListener('click', function () { ui.editing = true; fillForm(); showScreens(); });
+  var editIdx = null;
+  function hintText() { return editIdx !== null ? '(editing)' : C.sel ? '(from chart)' : '(now)'; }
+  function renderBoluses() {
+    var list = C.boluses || [], now = Date.now();
+    $('blist').innerHTML = list.map(function (b, i) {
+      var ign = b.atMs < C.startMs;
+      return '<div class="brow' + (ign ? ' ign' : '') + (i === editIdx ? ' editing' : '') + '" role="button" tabindex="0" data-i="' + i + '" aria-label="Edit bolus at ' + clock(b.atMs) + ', ' + Math.round(b.mg * 10) / 10 + ' mg">' +
+        '<span class="bt">' + clock(b.atMs) + '</span><span class="bm">' + Math.round(b.mg * 10) / 10 + ' mg</span><span class="bago">' + (ign ? 'before start, ignored' : dur(Math.max(0, (now - b.atMs) / 60000)) + ' ago') + '</span>' +
+        '<button type="button" class="del" data-del="' + i + '" aria-label="Remove bolus at ' + clock(b.atMs) + '">×</button></div>';
+    }).join('');
+    if (document.activeElement !== $('btime')) $('btime').value = clock(C.sel || now);
+    $('bhint').textContent = hintText();
+    $('badd').textContent = editIdx !== null ? 'Save' : 'Add';
+    $('bclear').hidden = !(C.sel && editIdx === null);
+    $('bcancel').hidden = editIdx === null;
+  }
+  function stepDose(d) {
+    var v = parseFloat($('bmg').value);
+    if (!(v >= 0)) v = 20;
+    v = d > 0 ? Math.min(500, v + 10) : (v > 10 ? v - 10 : v);
+    $('bmg').value = v;
+  }
+  $('bup').addEventListener('click', function () { stepDose(1); });
+  $('bdn').addEventListener('click', function () { stepDose(-1); });
+  $('btime').addEventListener('input', function () {
+    var v = $('btime').value;
+    C.sel = /^\d{1,2}:\d{2}$/.test(v) ? resolveStart(v) : null;
+    save(); draw(); $('bhint').textContent = hintText(); $('bclear').hidden = !(C.sel && editIdx === null);
+  });
+  $('bclear').addEventListener('click', function () { C.sel = null; save(); $('btime').blur(); renderBoluses(); draw(); });
+  function cancelEdit() { editIdx = null; C.sel = null; $('berr').innerHTML = ''; save(); renderBoluses(); draw(); }
+  $('bcancel').addEventListener('click', cancelEdit);
+  wrapEl.addEventListener('click', function (ev) {
+    if (!chartState || !C) return;
+    var svg = $('chart').querySelector('svg'); if (!svg) return;
+    var rect = svg.getBoundingClientRect(), x = ev.clientX - rect.left;
+    if (x < ML - 4 || x > rect.width - MR + 4) return;
+    var t = (x - ML) / (rect.width - ML - MR) * chartState.tmax;
+    var ms = Math.round((C.startMs + t * 60000) / 60000) * 60000;
+    ms = Math.min(ms, Math.floor(Date.now() / 60000) * 60000);
+    C.sel = Math.max(C.startMs, ms);
+    $('btime').blur(); save(); renderBoluses(); draw();
+  });
+  $('badd').addEventListener('click', function () {
+    var mg = parseFloat($('bmg').value), errs = [];
+    var ms = C.sel || Date.now();
+    if (!(mg >= 1 && mg <= 500)) errs.push('Enter a bolus dose from 1 to 500 mg.');
+    if (ms < C.startMs) errs.push('The bolus time must be after the induction start at ' + clock(C.startMs) + '.');
+    $('berr').innerHTML = errs.map(function (m) { return '<div class="msg err">' + m + '</div>'; }).join('');
+    if (errs.length) return;
+    C.boluses = C.boluses || [];
+    var entry = { atMs: ms, mg: Math.round(mg * 10) / 10 };
+    if (editIdx !== null && C.boluses[editIdx]) C.boluses[editIdx] = entry; else C.boluses.push(entry);
+    C.boluses.sort(function (a, b) { return a.atMs - b.atMs; });
+    editIdx = null; C.sel = null; save(); renderBoluses(); render();
+  });
+  function startEdit(i) {
+    var b = C.boluses[i]; if (!b) return;
+    editIdx = i; C.sel = b.atMs; $('bmg').value = b.mg; $('btime').value = clock(b.atMs);
+    $('berr').innerHTML = ''; save(); renderBoluses(); draw();
+  }
+  $('blist').addEventListener('click', function (e) {
+    var del = e.target.closest('button[data-del]');
+    if (del) {
+      var i = parseInt(del.getAttribute('data-del'), 10);
+      C.boluses.splice(i, 1);
+      if (editIdx === i) { editIdx = null; C.sel = null; } else if (editIdx !== null && i < editIdx) editIdx--;
+      save(); renderBoluses(); render(); return;
+    }
+    var row = e.target.closest('.brow'); if (row) startEdit(parseInt(row.getAttribute('data-i'), 10));
+  });
+  $('blist').addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    var row = e.target.closest('.brow'); if (!row || e.target !== row) return;
+    e.preventDefault(); startEdit(parseInt(row.getAttribute('data-i'), 10));
+  });
+  var nextChange = null;
+  function fmtCount(ms) {
+    var s = Math.max(0, Math.ceil(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
+    return (h ? h + ':' + pad(m) : m) + ':' + pad(x);
+  }
+  function tickCount() {
+    var el = $('count');
+    if (!ui.committed || !C) return;
+    if (!nextChange) { el.textContent = 'No further change expected in the next 4 hours.'; return; }
+    var rem = nextChange.ms - Date.now();
+    if (rem <= 0) { render(); return; }
+    el.innerHTML = 'Next change in <span class="t">' + fmtCount(rem) + '</span>to <span class="to">' + nextChange.v + ' mcg/kg/min' + (nextChange.v === 0 ? ' (pause)' : '') + '</span> at ' + clock(nextChange.ms);
+  }
+  setInterval(tickCount, 1000);
+  var armed = null;
+  $('reset').addEventListener('click', function () {
+    var b = $('reset');
+    if (!armed) {
+      armed = setTimeout(function () { armed = null; b.textContent = 'Reset'; b.classList.remove('danger-armed'); }, 4000);
+      b.textContent = 'Tap again to clear'; b.classList.add('danger-armed'); return;
+    }
+    clearTimeout(armed); armed = null; b.textContent = 'Reset'; b.classList.remove('danger-armed');
+    startFresh();
+  });
+  function startFresh() {
+    wipe(); C = newCase(); ui.committed = false; ui.editing = true; ui.resumePending = false;
+    $('manual').value = ''; $('warn').innerHTML = ''; $('ferr').innerHTML = ''; $('berr').innerHTML = ''; editIdx = null;
+    fillForm(); showScreens();
+  }
+  $('r-continue').addEventListener('click', function () { ui.resumePending = false; ui.committed = true; ui.editing = false; showScreens(); render(); });
+  $('r-change').addEventListener('click', function () { ui.resumePending = false; ui.committed = true; ui.editing = true; fillForm(); showScreens(); render(); });
+  $('r-new').addEventListener('click', startFresh);
+  $('tminus').addEventListener('click', function () { setTarget(curTarget() - 0.5); });
+  $('tplus').addEventListener('click', function () { setTarget(curTarget() + 0.5); });
+  $('target').addEventListener('change', function () { setTarget(parseFloat($('target').value)); });
+  var modal = $('modal');
+  function openModal() { $('manual').value = ''; renderManual(); modal.hidden = false; setTimeout(function () { $('manual').focus(); }, 30); }
+  function closeModal() { modal.hidden = true; $('ratebtn').focus(); }
+  $('ratebtn').addEventListener('click', openModal);
+  $('mclose').addEventListener('click', closeModal);
+  modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+  document.addEventListener('keydown', function (e) {
+    if (modal.hidden) return;
+    if (e.key === 'Escape') { closeModal(); return; }
+    if (e.key === 'Tab') {
+      var f = Array.prototype.slice.call(modal.querySelectorAll('input, button')).filter(function (x) { return !x.disabled && x.offsetParent !== null; });
+      if (!f.length) return;
+      var first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  });
+  var info = $('info');
+  function openInfo() { info.hidden = false; setTimeout(function () { $('iclose').focus(); }, 30); }
+  function closeInfo() { info.hidden = true; $('infobtn').focus(); }
+  $('infobtn').addEventListener('click', openInfo);
+  $('iclose').addEventListener('click', closeInfo);
+  info.addEventListener('click', function (e) { if (e.target === info) closeInfo(); });
+  document.addEventListener('keydown', function (e) {
+    if (info.hidden) return;
+    if (e.key === 'Escape') closeInfo();
+    else if (e.key === 'Tab') { e.preventDefault(); $('iclose').focus(); }
+  });
+  $('manual').addEventListener('input', renderManual);
+  $('mres').addEventListener('click', function (e) {
+    if (e.target.id !== 'usemanual') return;
+    var eq = Math.round(parseFloat($('manual').value) / unitRate(elapsedMin()) * 10) / 10;
+    $('manual').value = ''; closeModal(); setTarget(eq);
+  });
+  if (window.ResizeObserver) new ResizeObserver(function () { draw(); }).observe($('chart'));
+  setInterval(function () { $('clock').textContent = clock(Date.now()); render(); }, 15000);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) { $('clock').textContent = clock(Date.now()); render(); } });
+
+  /* ---------- boot ---------- */
+  $('clock').textContent = clock(Date.now());
+  var saved = load();
+  if (saved) {
+    C = saved; ui.resumePending = true; ui.committed = false; ui.editing = false;
+    var elm = elapsedMin();
+    $('resume-sum').innerHTML = '<b>' + ptText(C.patient) + '</b><br>Started ' + dayPrefix(C.startMs) + clock(C.startMs) + ' (' + dur(elm) + ' ago), target effect ' + f1(curTarget()) + ' mcg/mL.' + (C.boluses.length ? ' ' + C.boluses.length + ' bolus' + (C.boluses.length > 1 ? 'es' : '') + ' logged.' : '');
+    fillForm();
+    var origContinue = ui.committed;
+  } else {
+    C = newCase(); fillForm();
+  }
+  showScreens();
+})();
+</script>
+</body>
+</html>
