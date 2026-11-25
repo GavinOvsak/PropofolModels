@@ -618,6 +618,7 @@ var TCI = (function () {
 (function () {
   var $ = function (id) { return document.getElementById(id); };
   var KEY = 'tciPropofolCase.v1', MAXMIN = 600;
+  var DEFAULT_START_OFFSET_MIN = 15;
   var DEFAULT_PT = { sex: 'M', age: 50, wt: 70, ht: 170, model: 'schnider', opioid: true };
   var MODEL_NAMES = { schnider: 'Schnider', marsh: 'Marsh', eleveld: 'Eleveld' };
   var C = null;            // current case
@@ -649,7 +650,7 @@ var TCI = (function () {
     return ms;
   }
   function newCase() {
-    var now = Math.floor(Date.now() / 60000) * 60000;
+    var now = Math.floor(Date.now() / 60000) * 60000 - DEFAULT_START_OFFSET_MIN * 60000;  // default start is 15 min before now
     return { patient: JSON.parse(JSON.stringify(DEFAULT_PT)), startMs: now, targets: [{ atMs: now, target: 3.5 }], boluses: [], sel: null, bis: [], bisCue: 0 };
   }
   function validCase(o) {

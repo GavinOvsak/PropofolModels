@@ -68,7 +68,7 @@ The current case is saved in your browser, and the app offers to continue it the
 
 1. Open the app and choose sex, age, weight and height for a mock patient.
 2. Pick a model: **Schnider**, **Marsh** or **Eleveld**. For Eleveld, say whether an opioid was given.
-3. Set the induction start time (or tap **Use now**) and an initial target effect-site concentration.
+3. Set the induction start time and an initial target effect-site concentration. The start time defaults to 15 minutes ago, and **Use now** sets it to the current time.
 4. Tap **Start case**. The suggested rate, chart and countdown appear.
 5. Change the target or log boluses as the case evolves. Tap **Reset** (twice) to clear everything and start a new mock patient.
 
@@ -155,7 +155,7 @@ To try it locally, open `index.html` in a browser, or run `python3 -m http.serve
 
 - **Add a model:** add a branch to `buildModel` that returns `V1, V2, V3, k10, k12, k21, k13, k31, ke0`, then add it to the `#model` dropdown and to `MODEL_NAMES`.
 - **Change units or rounding:** `round10` controls the rate step, and the labels are set in the `render()` function.
-- **Change the default patient:** edit `DEFAULT_PT` near the top of the main script.
+- **Change the default patient or start time:** edit `DEFAULT_PT` and `DEFAULT_START_OFFSET_MIN` near the top of the main script.
 - **Change the saved-case key:** edit `KEY`. Bump the version suffix if you change what is stored, so old saved cases are ignored.
 - **Ship an update to installed copies:** the page is fetched fresh whenever the user is online, but if you change `sw.js` or add files to its cache list, bump `VERSION` in `sw.js`.
 - **Add a new file to the site:** list it in `SHELL` in `sw.js` and copy it in the deploy workflow's *Stage site* step.
