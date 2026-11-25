@@ -6,6 +6,12 @@
 <title>Propofol Target Simulator</title>
 <meta name="description" content="Educational simulator that suggests manual propofol infusion rates for a chosen target effect-site concentration, using the Schnider, Marsh or Eleveld model.">
 <meta name="theme-color" content="#0e6a73">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Propofol">
 <script>
 // Apply a saved light/dark choice before first paint. With no saved choice the page follows the system setting.
 try { var th = localStorage.getItem('tciPropofolTheme'); if (th === 'light' || th === 'dark') document.documentElement.setAttribute('data-theme', th); } catch (e) {}
@@ -1222,6 +1228,11 @@ var TCI = (function () {
     root.setAttribute('data-theme', next);
     try { localStorage.setItem('tciPropofolTheme', next); } catch (e) {}
   });
+
+  /* ---------- offline support ---------- */
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+  }
 
   /* ---------- boot ---------- */
   var saved = load();

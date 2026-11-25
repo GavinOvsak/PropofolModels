@@ -4,7 +4,7 @@
 
 > **Open the app:** [gavinovsak.github.io/PropofolModels](https://gavinovsak.github.io/PropofolModels/)
 
-No download, no login, no installation. Works on a phone, tablet or computer.
+No download, no login, no installation. Works on a phone, tablet or computer, and can be installed like an app that keeps working without a connection (see below).
 
 > **For educational use only, not for clinical use.** This is not a medical device. It does not replace clinical judgment, your pump, or your institution's protocols. It uses a mock patient and has not been validated against any pump or against patient outcomes.
 
@@ -49,6 +49,14 @@ With the Eleveld model the app shows an expected BIS, prompts for a BIS value af
 ### Light and dark mode
 
 The app follows your device setting by default. The sun/moon button next to the title switches it, and your choice is remembered in the browser.
+
+### Installs as an app and works offline
+
+It is a progressive web app (PWA). After the first visit it loads without a connection.
+
+- **iPhone/iPad:** open the link in Safari, tap the Share icon, then *Add to Home Screen*
+- **Android:** open the link in Chrome, tap the three-dot menu, then *Install app* or *Add to Home Screen*
+- **Desktop Chrome or Edge:** use the install icon in the address bar
 
 ### Resumes after a refresh
 
@@ -119,13 +127,13 @@ Please open an issue at [github.com/GavinOvsak/PropofolModels/issues](https://gi
 
 ## Make your own version
 
-The whole app is one file, [`index.html`](index.html), with no build step, no dependencies and no backend. That makes it easy to fork.
+The app itself is one file, [`index.html`](index.html), with no build step, no dependencies and no backend. A few small files around it make it installable and available offline. That makes it easy to fork.
 
 ### Host your own copy on GitHub Pages
 
 1. Fork this repository.
 2. In your fork, open **Settings, Pages** and set **Source** to **GitHub Actions**.
-3. Push to `main` (or run the workflow from the **Actions** tab). The workflow in [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) copies `index.html` into a site folder and publishes it.
+3. Push to `main` (or run the workflow from the **Actions** tab). The workflow in [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) copies the site files into a folder and publishes it.
 4. Your copy appears at `https://<your-username>.github.io/<repo-name>/`.
 
 To try it locally, open `index.html` in a browser, or run `python3 -m http.server` in the repo folder.
@@ -139,6 +147,9 @@ To try it locally, open `index.html` in a browser, or run `python3 -m http.serve
 | `profile()` and `buildSeries()` | Turn the engine output into the rate per 10 second step, including the bolus adjustment. |
 | `render()` and `draw()` | Update the page and draw the SVG chart. |
 | `.foam-ribbon` | The #FOAM App corner ribbon. |
+| `manifest.webmanifest` | App name, colors and icons used when the app is installed. |
+| `sw.js` | The service worker that caches the app for offline use. |
+| `icons/` | App icons (SVG sources and PNG exports). |
 
 ### Common changes
 
@@ -146,6 +157,9 @@ To try it locally, open `index.html` in a browser, or run `python3 -m http.serve
 - **Change units or rounding:** `round10` controls the rate step, and the labels are set in the `render()` function.
 - **Change the default patient:** edit `DEFAULT_PT` near the top of the main script.
 - **Change the saved-case key:** edit `KEY`. Bump the version suffix if you change what is stored, so old saved cases are ignored.
+- **Ship an update to installed copies:** the page is fetched fresh whenever the user is online, but if you change `sw.js` or add files to its cache list, bump `VERSION` in `sw.js`.
+- **Add a new file to the site:** list it in `SHELL` in `sw.js` and copy it in the deploy workflow's *Stage site* step.
+- **Change the app icon:** edit `icons/icon.svg` and `icons/maskable.svg` and export the PNGs at 192, 512 and 180 pixels (the maskable one at 512).
 - **Keep or drop the ribbon:** the ribbon links to the FOAMapps directory. Delete the `.foam-ribbon` block if your fork is not part of it, or add your own app to the directory (see below).
 
 ### List your app in #FOAM Apps
