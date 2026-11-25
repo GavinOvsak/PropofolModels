@@ -46,6 +46,10 @@ Tap the big number and enter the rate you actually set. The app tells you which 
 
 With the Eleveld model the app shows an expected BIS, prompts for a BIS value after a rate drop, keeps a log comparing predicted and entered values, and suggests a target nudge if BIS falls outside 40 to 60.
 
+### Light and dark mode
+
+The app follows your device setting by default. The sun/moon button next to the title switches it, and your choice is remembered in the browser.
+
 ### Resumes after a refresh
 
 The current case is saved in your browser, and the app offers to continue it the next time you open the page.
@@ -130,7 +134,7 @@ To try it locally, open `index.html` in a browser, or run `python3 -m http.serve
 
 | Section | What it is |
 |---|---|
-| `<style>` | Design tokens at the top (`:root`), with light and dark themes. Change `--accent` to recolor the app. |
+| `<style>` | Design tokens at the top (`:root`), with light and dark themes. Change `--accent` to recolor the app. The theme button saves its choice under `tciPropofolTheme`. |
 | `var TCI = (function () {...})()` | The pharmacokinetic engine: `buildModel` holds each model's parameters, `discretise` and `simulate` do the maths. |
 | `profile()` and `buildSeries()` | Turn the engine output into the rate per 10 second step, including the bolus adjustment. |
 | `render()` and `draw()` | Update the page and draw the SVG chart. |
