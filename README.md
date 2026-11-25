@@ -168,4 +168,8 @@ Add an entry to [`public/data/apps.json`](https://github.com/GavinOvsak/FOAMapps
 
 ---
 
+## License
+
+Released under the [MIT License](LICENSE). You are free to use, copy, modify, fork and redistribute this app, including in your own projects, as long as the copyright and license notice stay with it. It is provided as is, with no warranty, and is for educational use only (see the notice at the top).
+
 *Built for learners, by a clinician.*
