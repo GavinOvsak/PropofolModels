@@ -52,7 +52,6 @@ body { background: var(--bg); color: var(--ink); font: 16px/1.45 var(--font-body
 h1 { margin: 0; font-size: 15px; font-weight: 600; color: var(--ink2); letter-spacing: 0.02em; }
 h2 { margin: 0 0 10px; font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink2); }
 .top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
-.clock { font: 500 14px var(--font-num); color: var(--muted); }
 .btn { min-height: 44px; padding: 0 16px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 10px; font: 500 15px var(--font-body); cursor: pointer; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
 .btn.small { min-height: 36px; padding: 0 12px; font-size: 14px; }
@@ -217,7 +216,6 @@ body { position: relative; }
 .foam-ribbon { position: absolute; top: 0; right: 0; width: 120px; height: 120px; overflow: hidden; pointer-events: none; z-index: 10; }
 .foam-ribbon a { position: absolute; top: 26px; right: -60px; width: 200px; display: block; padding: 7px 0; transform: rotate(45deg); background: var(--accent); color: var(--accent-ink); font: 700 14px var(--font-body); letter-spacing: 0.04em; text-align: center; white-space: nowrap; text-decoration: none; box-shadow: 0 2px 6px rgba(0,0,0,0.2); pointer-events: auto; }
 .foam-ribbon a:hover { filter: brightness(1.1); }
-@media (max-width: 899px) { .top { display: block; } .top .clock { margin-top: 2px; } }
 </style>
 </head>
 <body>
@@ -225,7 +223,6 @@ body { position: relative; }
 <div class="wrap">
   <div class="top">
     <h1>Propofol Target Simulator</h1>
-    <div class="clock" id="clock" aria-live="off"></div>
   </div>
 
   <section class="card" id="resume" hidden aria-labelledby="h-resume">
@@ -1200,11 +1197,10 @@ var TCI = (function () {
     $('manual').value = ''; closeModal(); setTarget(eq);
   });
   if (window.ResizeObserver) new ResizeObserver(function () { draw(); }).observe($('chart'));
-  setInterval(function () { $('clock').textContent = clock(Date.now()); render(); }, 15000);
-  document.addEventListener('visibilitychange', function () { if (!document.hidden) { $('clock').textContent = clock(Date.now()); render(); } });
+  setInterval(render, 15000);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) render(); });
 
   /* ---------- boot ---------- */
-  $('clock').textContent = clock(Date.now());
   var saved = load();
   if (saved) {
     C = saved; ui.resumePending = true; ui.committed = false; ui.editing = false;
