@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TCI Model Guide</title>
+<meta name="description" content="A plain-language guide to target-controlled infusion of propofol: what a target is, how to think about choosing one, and how the Marsh, Schnider and Eleveld models differ.">
+<meta name="theme-color" content="#0e6a73">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script>
+// Use the same light/dark choice as the simulator.
+try { var th = localStorage.getItem('tciPropofolTheme'); if (th === 'light' || th === 'dark') document.documentElement.setAttribute('data-theme', th); } catch (e) {}
+</script>
+<style>
+:root {
+  --bg: #f1f4f6; --surface: #ffffff; --ink: #14202b; --ink2: #44525f; --muted: #6f7c88; --line: #dbe2e8;
+  --accent: #0e6a73; --accent-ink: #ffffff; --accent-soft: #e2f1f2; --warn-bg: #fff3dc; --warn-ink: #6b4300;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e151b; --surface: #16202a; --ink: #e8eef3; --ink2: #aab7c3; --muted: #8995a1; --line: #2a3744;
+    --accent: #4fc1c9; --accent-ink: #06262a; --accent-soft: #14333a; --warn-bg: #3a2c0e; --warn-ink: #f2d38b; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e151b; --surface: #16202a; --ink: #e8eef3; --ink2: #aab7c3; --muted: #8995a1; --line: #2a3744;
+  --accent: #4fc1c9; --accent-ink: #06262a; --accent-soft: #14333a; --warn-bg: #3a2c0e; --warn-ink: #f2d38b; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.55 var(--font-body); -webkit-text-size-adjust: 100%; }
+.wrap { max-width: 760px; margin: 0 auto; padding: 16px 16px 56px; display: grid; gap: 14px; }
+a { color: var(--accent); }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.back { display: inline-flex; align-items: center; min-height: 44px; font-weight: 500; text-decoration: none; }
+.back:hover { text-decoration: underline; }
+h1 { margin: 0; font-size: 26px; line-height: 1.2; letter-spacing: -0.01em; }
+.lede { margin: 6px 0 0; color: var(--ink2); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+h2 { margin: 0 0 8px; font-size: 18px; }
+h3 { margin: 16px 0 4px; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink2); }
+p { margin: 0 0 10px; }
+p:last-child, ul:last-child { margin-bottom: 0; }
+ul { margin: 0 0 10px; padding-left: 20px; }
+li { margin-bottom: 4px; }
+.toc { display: flex; gap: 8px; flex-wrap: wrap; margin: 0; padding: 0; list-style: none; }
+.toc a { display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); text-decoration: none; font-weight: 500; }
+.note { background: var(--warn-bg); color: var(--warn-ink); border-radius: 8px; padding: 10px 12px; font-size: 14px; }
+.tablewrap { overflow-x: auto; margin: 8px 0; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 460px; }
+th { text-align: left; font-size: 12px; color: var(--muted); padding: 6px 10px 6px 0; }
+td { padding: 8px 10px 8px 0; border-top: 1px solid var(--line); vertical-align: top; }
+td.n, th.n { font-family: var(--font-num); white-space: nowrap; }
+.tag { display: inline-block; font: 500 12px var(--font-num); background: var(--accent-soft); color: var(--accent); border-radius: 6px; padding: 2px 8px; margin-bottom: 8px; }
+.small { font-size: 13px; color: var(--muted); }
+dl { margin: 0; }
+dt { font-weight: 600; margin-top: 10px; }
+dd { margin: 2px 0 0; color: var(--ink2); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="./">&larr; Back to the simulator</a>
+
+  <header>
+    <h1>TCI model guide</h1>
+    <p class="lede">New to target-controlled infusion? This page explains what a target is, how people think about choosing one, and how the three models in the simulator differ.</p>
+  </header>
+
+  <nav aria-label="On this page">
+    <ul class="toc">
+      <li><a href="#tci">What is TCI</a></li>
+      <li><a href="#target">What is a target</a></li>
+      <li><a href="#choose">Choosing a target</a></li>
+      <li><a href="#marsh">Marsh</a></li>
+      <li><a href="#schnider">Schnider</a></li>
+      <li><a href="#eleveld">Eleveld</a></li>
+      <li><a href="#compare">Compare</a></li>
+    </ul>
+  </nav>
+
+  <p class="note">For education only, not for clinical use. The ranges below are broad figures from the literature and common teaching. They are not recommendations for any patient. Follow your institution's protocols and titrate to the patient in front of you.</p>
+
+  <section class="card" id="tci" aria-labelledby="h-tci">
+    <h2 id="h-tci">What is TCI?</h2>
+    <p>With a normal infusion you choose a rate and the blood level follows wherever it ends up. With target-controlled infusion you choose the <b>blood or brain level you want</b>, and the pump works out the rate to get there and hold it.</p>
+    <p>To do that it uses a pharmacokinetic model: a set of equations describing how propofol spreads from the blood into other tissues and is cleared. The model is fed the patient's age, weight and so on, and it predicts the concentration over time. The pump then speeds up, slows down or pauses to keep the prediction on target.</p>
+    <p>Two things follow from this. First, the numbers on the screen are <b>predictions, not measurements</b>. Second, different models can give different rates for the same patient and the same target. That is why this app lets you switch between them.</p>
+  </section>
+
+  <section class="card" id="target" aria-labelledby="h-target">
+    <h2 id="h-target">What does the target mean?</h2>
+    <p>The target is a concentration of propofol in mcg/mL (the same as mg/L). There are two places you can aim it:</p>
+    <ul>
+      <li><b>Plasma target:</b> the level in the blood. It is reached quickly, but the brain lags behind, so the patient may not yet be asleep when the pump says the target is reached.</li>
+      <li><b>Effect-site target:</b> the predicted level at the brain, where the drug actually acts. The pump gives a larger initial push so the brain level reaches the target sooner, then settles back.</li>
+    </ul>
+    <p>This simulator uses <b>effect-site targets</b> for all three models. The lag between blood and brain is described by a rate constant called ke0. A bigger ke0 means the brain catches up faster.</p>
+    <p>The simulator then ignores the initial loading bolus and shows the <b>manual infusion rate</b> (mcg/kg/min) that keeps the effect site at your target, stepping down as drug builds up in the tissues. That is why the suggested rate falls over time even though the target stays the same.</p>
+  </section>
+
+  <section class="card" id="choose" aria-labelledby="h-choose">
+    <h2 id="h-choose">What should the target be?</h2>
+    <p>There is no single right number. Needs vary a lot between patients, and they depend on what else is on board and how stimulating the surgery is. The ranges below are the kind of effect-site figures you will see quoted, to give you a feel for the scale.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Situation</th><th class="n">Effect-site target</th></tr></thead>
+        <tbody>
+          <tr><td>Sedation</td><td class="n">about 0.5 to 2.5</td></tr>
+          <tr><td>General anesthesia, with an opioid or regional block</td><td class="n">about 2.5 to 4</td></tr>
+          <tr><td>General anesthesia without an opioid, or a young, fit patient</td><td class="n">about 4 to 6</td></tr>
+          <tr><td>Older, frail or hemodynamically fragile patient</td><td>Lower end of the range, adjusted slowly</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>In practice the target is a starting point. People adjust it up or down by about 0.5 mcg/mL at a time, watching the patient, hemodynamics and, if available, a processed EEG such as BIS (often kept between 40 and 60). The Eleveld option in the simulator shows an expected BIS to illustrate that link.</p>
+    <p class="small">Opioids and other sedatives reduce how much propofol is needed, so the same patient may need a very different target depending on the rest of the anesthetic.</p>
+  </section>
+
+  <section class="card" id="marsh" aria-labelledby="h-marsh">
+    <span class="tag">Marsh</span>
+    <h2 id="h-marsh">Marsh model</h2>
+    <p>The oldest and simplest of the three. It is a weight-scaled version of earlier adult data and was used in the first commercial TCI pumps.</p>
+    <dl>
+      <dt>Inputs</dt><dd>Weight only. Age, height and sex make no difference.</dd>
+      <dt>Built from</dt><dd>Adult pharmacokinetic data scaled by body weight, described by Marsh and colleagues in 1991.</dd>
+      <dt>Blood-to-brain lag (ke0)</dt><dd>The original model has no effect-site part. This app pairs it with a ke0 of 1.21 per minute. Pumps pair Marsh with different ke0 values, so effect-site behavior with Marsh varies between devices.</dd>
+      <dt>Good to know</dt><dd>Because it ignores age, it tends to give relatively large doses in older patients. Many teams therefore use lower targets with Marsh in the elderly. It uses total body weight, so check local practice in patients with obesity.</dd>
+    </dl>
+  </section>
+
+  <section class="card" id="schnider" aria-labelledby="h-schnider">
+    <span class="tag">Schnider</span>
+    <h2 id="h-schnider">Schnider model</h2>
+    <p>A model that adjusts for the patient's age and body size. It was built together with a description of how the effect site responds, so effect-site targeting is a natural fit.</p>
+    <dl>
+      <dt>Inputs</dt><dd>Age, weight and height, plus lean body mass worked out from weight and height (James formula) and sex.</dd>
+      <dt>Built from</dt><dd>Studies in healthy volunteers published by Schnider and colleagues in 1998 and 1999.</dd>
+      <dt>Blood-to-brain lag (ke0)</dt><dd>0.456 per minute.</dd>
+      <dt>Good to know</dt><dd>The volunteers covered ages 25 to 81, weight 44 to 123 kg and height 155 to 196 cm. The simulator warns you outside that range. The lean body mass formula can behave oddly at high BMI, so be careful with larger patients.</dd>
+    </dl>
+  </section>
+
+  <section class="card" id="eleveld" aria-labelledby="h-eleveld">
+    <span class="tag">Eleveld</span>
+    <h2 id="h-eleveld">Eleveld model</h2>
+    <p>The newest of the three. It is a general-purpose model fitted to pooled data from many studies, so it is meant to work across a much wider range of patients than the older models.</p>
+    <dl>
+      <dt>Inputs</dt><dd>Age, sex, weight and height, plus whether an opioid is given alongside the propofol.</dd>
+      <dt>Built from</dt><dd>Pooled data from many studies covering children through older adults and a wide range of body sizes, published by Eleveld and colleagues in 2018.</dd>
+      <dt>Blood-to-brain lag (ke0)</dt><dd>Scaled to the patient's weight rather than fixed.</dd>
+      <dt>Good to know</dt><dd>It accounts for body composition and for the effect of opioids, which the other two do not. It also comes with a description of how BIS relates to the effect-site level, which the simulator uses to show an expected BIS. It is more complex, and it is less commonly the default on pumps than the other two, so check which models your equipment offers.</dd>
+    </dl>
+  </section>
+
+  <section class="card" id="compare" aria-labelledby="h-compare">
+    <h2 id="h-compare">Side by side</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th></th><th>Marsh</th><th>Schnider</th><th>Eleveld</th></tr></thead>
+        <tbody>
+          <tr><td>Uses</td><td>Weight</td><td>Age, weight, height, sex</td><td>Age, weight, height, sex, opioid</td></tr>
+          <tr><td>Designed for</td><td>Plasma targets</td><td>Effect-site targets</td><td>Either</td></tr>
+          <tr><td>Age range</td><td>Adults, no age adjustment</td><td>About 25 to 81 y</td><td>Wide, children to elderly</td></tr>
+          <tr><td>Body size</td><td>Total weight</td><td>Lean body mass</td><td>Allows for body composition</td></tr>
+          <tr><td>ke0 in this app</td><td class="n">1.21 /min</td><td class="n">0.456 /min</td><td>Scaled to weight</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>A useful exercise: enter one patient, keep the target the same, and switch between the three models to see how the suggested rates and the chart change.</p>
+  </section>
+
+  <section class="card" aria-labelledby="h-ref">
+    <h2 id="h-ref">Where to read more</h2>
+    <ul>
+      <li>Marsh B, et al. Pharmacokinetic model driven infusion of propofol in children. <i>Br J Anaesth</i> 1991;67:41.</li>
+      <li>Schnider TW, et al. The influence of method of administration and covariates on the pharmacokinetics of propofol in adult volunteers. <i>Anesthesiology</i> 1998;88:1170.</li>
+      <li>Schnider TW, et al. The influence of age on propofol pharmacodynamics. <i>Anesthesiology</i> 1999;90:1502.</li>
+      <li>Eleveld DJ, et al. Pharmacokinetic-pharmacodynamic model for propofol for broad application in anaesthesia and sedation. <i>Br J Anaesth</i> 2018;120:942.</li>
+    </ul>
+  </section>
+
+  <a class="back" href="./">&larr; Back to the simulator</a>
+</div>
+</body>
+</html>

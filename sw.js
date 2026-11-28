@@ -1,8 +1,8 @@
 // Offline support. Bump VERSION when you change any cached file so installed copies pick up the update.
-var VERSION = 'v1';
+var VERSION = 'v2';
 var CACHE = 'propofol-sim-' + VERSION;
 var FONT_CACHE = 'propofol-sim-fonts';
-var SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
+var SHELL = ['./', 'index.html', 'models.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL); }).then(function () { return self.skipWaiting(); }));
@@ -35,9 +35,10 @@ self.addEventListener('fetch', function (e) {
   if (req.mode === 'navigate') {
     e.respondWith(fetch(req).then(function (res) {
       var copy = res.clone();
-      caches.open(CACHE).then(function (c) { c.put('index.html', copy); });
+      var key = url.pathname.slice(-11) === 'models.html' ? 'models.html' : 'index.html';
+      caches.open(CACHE).then(function (c) { c.put(key, copy); });
       return res;
-    }).catch(function () { return caches.match('index.html'); }));
+    }).catch(function () { return caches.match(url.pathname.slice(-11) === 'models.html' ? 'models.html' : 'index.html'); }));
     return;
   }
 

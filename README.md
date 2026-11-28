@@ -50,6 +50,10 @@ With the Eleveld model the app shows an expected BIS, prompts for a BIS value af
 
 The app follows your device setting by default. The sun/moon button next to the title switches it, and your choice is remembered in the browser.
 
+### Includes a plain-language model guide
+
+New to TCI? [`models.html`](models.html) (linked from the app) explains what target-controlled infusion is, the difference between plasma and effect-site targets, the kind of target ranges people quote, and how Marsh, Schnider and Eleveld differ. It also works offline.
+
 ### Installs as an app and works offline
 
 It is a progressive web app (PWA). After the first visit it loads without a connection.
@@ -147,6 +151,7 @@ To try it locally, open `index.html` in a browser, or run `python3 -m http.serve
 | `profile()` and `buildSeries()` | Turn the engine output into the rate per 10 second step, including the bolus adjustment. |
 | `render()` and `draw()` | Update the page and draw the SVG chart. |
 | `.foam-ribbon` | The #FOAM App corner ribbon. |
+| `models.html` | The model guide page. It reuses the same design tokens and light/dark choice as the app. |
 | `manifest.webmanifest` | App name, colors and icons used when the app is installed. |
 | `sw.js` | The service worker that caches the app for offline use. |
 | `icons/` | App icons (SVG sources and PNG exports). |
@@ -158,7 +163,8 @@ To try it locally, open `index.html` in a browser, or run `python3 -m http.serve
 - **Change the default patient or start time:** edit `DEFAULT_PT` and `DEFAULT_START_OFFSET_MIN` near the top of the main script.
 - **Change the saved-case key:** edit `KEY`. Bump the version suffix if you change what is stored, so old saved cases are ignored.
 - **Ship an update to installed copies:** the page is fetched fresh whenever the user is online, but if you change `sw.js` or add files to its cache list, bump `VERSION` in `sw.js`.
-- **Add a new file to the site:** list it in `SHELL` in `sw.js` and copy it in the deploy workflow's *Stage site* step.
+- **Add a new file to the site:** list it in `SHELL` in `sw.js` and copy it in the deploy workflow's *Stage site* step. Bump `VERSION` in `sw.js` too.
+- **Edit the guide or target ranges:** they are plain HTML in `models.html`. Have a clinician review any change to the target table.
 - **Change the app icon:** edit `icons/icon.svg` and `icons/maskable.svg` and export the PNGs at 192, 512 and 180 pixels (the maskable one at 512).
 - **Keep or drop the ribbon:** the ribbon links to the FOAMapps directory. Delete the `.foam-ribbon` block if your fork is not part of it, or add your own app to the directory (see below).
 
