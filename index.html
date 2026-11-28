@@ -689,6 +689,8 @@ var TCI = (function () {
     return r;
   }
   function elapsedMin() { return Math.max(0, (Date.now() - C.startMs) / 60000); }
+  // The model runs for MAXMIN minutes. A case older than that has no rates to show, so it asks for a new start time or a reset.
+  function tooOld() { return !!C && elapsedMin() > MAXMIN - 10; }
   function ptText(p) { return (p.sex === 'M' ? 'Male' : 'Female') + ', ' + p.age + ' y, ' + p.wt + ' kg, ' + p.ht + ' cm, ' + MODEL_NAMES[p.model] + (p.model === 'eleveld' ? (p.opioid ? ', with opioid' : ', no opioid') : ''); }
 
   /* ---------- pharmacology ---------- */
@@ -774,7 +776,7 @@ var TCI = (function () {
     var show = !ui.resumePending;
     $('setup').hidden = !(show && ui.editing);
     $('casebar').hidden = !(show && ui.committed && !ui.editing);
-    $('main').hidden = !(show && ui.committed);
+    $('main').hidden = !(show && ui.committed) || tooOld();
     $('t0-field').hidden = ui.committed;
     $('done').textContent = ui.committed ? 'Done' : 'Start case';
   }
@@ -818,11 +820,17 @@ var TCI = (function () {
     if (P.model === 'schnider' && (P.age < 25 || P.age > 81 || P.wt < 44 || P.wt > 123 || P.ht < 155 || P.ht > 196))
       w.push('These values are outside the range the Schnider model was built on (age 25 to 81, weight 44 to 123 kg, height 155 to 196 cm).');
     if (bmi >= 35) w.push('BMI is ' + bmi.toFixed(0) + '. ' + (P.model === 'eleveld' ? 'Eleveld accounts for body composition, but check local practice.' : 'This model uses total body weight, so many teams adjust the weight in obesity. Check local practice.'));
-    if (elapsedMin() > 720) w.push('This case started more than 12 hours ago. Reset if this is a new patient.');
     return w;
   }
   function render() {
     if (!ui.committed || !C) return;
+    if (tooOld()) {
+      $('main').hidden = true;
+      $('casesum').innerHTML = '<b>' + ptText(C.patient) + '</b><br><span>Started ' + dayPrefix(C.startMs) + clock(C.startMs) + ', ' + dur(elapsedMin()) + ' ago</span>';
+      $('warn').innerHTML = '<div class="msg err">This case started more than ' + Math.floor((MAXMIN - 10) / 60) + ' hours ago, which is longer than the simulator models. Tap Edit to change the start time, or Reset to start a new case.</div>';
+      return;
+    }
+    if (!ui.resumePending) $('main').hidden = false;  // coming back from a too-old start time
     var r1 = profile();
     if (!r1) {
       $('warn').innerHTML = '<div class="msg err">These demographics give an invalid model parameter set. Check age, weight and height.</div>';
@@ -892,6 +900,7 @@ var TCI = (function () {
     var nowV = round10(serAt(el));
     past.push({ t: el, v: nowV });
     for (t = el; t <= tmax + 1e-9; t += STEP) { var fv = round10(serAt(t)); fut.push({ t: t, v: fv }); vmax = Math.max(vmax, fv); }
+    if (!fut.length) return;
     fut[0].v = nowV;
     var nt = niceTicks(vmax * 1.12, 4);
     var ys = function (v) { return MT + ph - (v / nt.top) * ph; };
