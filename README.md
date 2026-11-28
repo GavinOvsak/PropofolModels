@@ -52,7 +52,7 @@ The app follows your device setting by default. The sun/moon button next to the 
 
 ### Includes a plain-language model guide
 
-New to TCI? [`models.html`](models.html) (linked from the app) explains what target-controlled infusion is, the difference between plasma and effect-site targets, the kind of target ranges people quote, and how Marsh, Schnider and Eleveld differ. It also works offline.
+New to TCI? The guide (linked from the app) explains what target-controlled infusion is, the difference between plasma and effect-site targets, the kind of target ranges people quote, and how Marsh, Schnider and Eleveld differ. It opens as an overlay on top of the simulator, full screen on a phone. A sticky header shows which section you are in, and the Contents button opens a list that closes again when you pick a section. It also works offline, and it is available as a standalone page at [`models.html`](https://gavinovsak.github.io/PropofolModels/models.html) for sharing.
 
 ### Installs as an app and works offline
 
@@ -151,7 +151,7 @@ To try it locally, open `index.html` in a browser, or run `python3 -m http.serve
 | `profile()` and `buildSeries()` | Turn the engine output into the rate per 10 second step, including the bolus adjustment. |
 | `render()` and `draw()` | Update the page and draw the SVG chart. |
 | `.foam-ribbon` | The #FOAM App corner ribbon. |
-| `models.html` | The model guide page. It reuses the same design tokens and light/dark choice as the app. |
+| `models.html` | The model guide. The app shows it in an iframe overlay (`#guide` in `index.html`), and it also works as a standalone page. It has its own sticky header and contents list, and reuses the app's design tokens and light/dark choice. |
 | `manifest.webmanifest` | App name, colors and icons used when the app is installed. |
 | `sw.js` | The service worker that caches the app for offline use. |
 | `icons/` | App icons (SVG sources and PNG exports). |

@@ -162,6 +162,10 @@ input[aria-invalid="true"] { border-color: var(--err-ink); }
 .chk { display: flex; align-items: center; gap: 10px; margin: 4px 0 10px; font-size: 15px; color: var(--ink2); min-height: 44px; }
 .chk input { width: 22px; height: 22px; accent-color: var(--accent); flex: none; }
 .chk[hidden] { display: none; }
+.gmodal { position: fixed; inset: 0; z-index: 30; background: rgba(8, 14, 20, 0.55); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.gdialog { width: 100%; max-width: 760px; height: min(92vh, 920px); background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; box-shadow: 0 12px 40px rgba(0,0,0,0.35); }
+.gdialog iframe { display: block; width: 100%; height: 100%; border: 0; background: var(--bg); }
+@media (max-width: 640px) { .gmodal { padding: 0; } .gdialog { max-width: none; height: 100vh; height: 100dvh; border: 0; border-radius: 0; } }
 .linkbtn { background: none; border: 0; padding: 6px 0; color: var(--accent); font: 500 14px var(--font-body); cursor: pointer; text-decoration: underline; }
 .brow { cursor: pointer; }
 .brow.editing { background: var(--accent-soft); margin: 0 -8px; padding-left: 8px; padding-right: 8px; border-radius: 8px; }
@@ -292,7 +296,7 @@ body { position: relative; }
       </div>
       <div class="field" id="t0-field"><label for="t0">Target effect-site <span class="unit">mcg/mL</span></label><input id="t0" type="number" inputmode="decimal" min="0.5" max="10" step="0.1"></div>
     </div>
-    <p class="muted" style="margin: 0 0 8px">New to TCI? <a href="models.html">Read the model guide</a> to see how the three models differ and what a target means.</p>
+    <p class="muted" style="margin: 0 0 8px">New to TCI? <a href="models.html" data-guide="">Read the model guide</a> to see how the three models differ and what a target means.</p>
     <label class="chk" id="opioid-field" hidden><input type="checkbox" id="opioid"> <span>Opioid given with propofol (Eleveld uses this)</span></label>
     <div class="msgs" id="ferr" aria-live="polite"></div>
     <div class="actions" style="margin-top: 8px">
@@ -369,9 +373,15 @@ body { position: relative; }
     </section>
 
     <section class="notes" style="margin-top: 14px">
-      <p><button type="button" class="linkbtn" id="infobtn" aria-haspopup="dialog">How rates are worked out</button> &nbsp; <a href="models.html" class="linkbtn">Model guide: what TCI is and how the models differ</a></p>
+      <p><button type="button" class="linkbtn" id="infobtn" aria-haspopup="dialog">How rates are worked out</button> &nbsp; <a href="models.html" class="linkbtn" data-guide="">Model guide: what TCI is and how the models differ</a></p>
       <p>For educational use only, not for clinical use. This tool is not a medical device and does not replace clinical judgment, your pump, or your institution's protocols. <span id="storewarn" hidden>This browser blocked saving, so a refresh will clear the case.</span></p>
     </section>
+  </div>
+</div>
+
+<div class="gmodal" id="guide" hidden>
+  <div class="gdialog" role="dialog" aria-modal="true" aria-label="TCI model guide">
+    <iframe id="gframe" title="TCI model guide"></iframe>
   </div>
 </div>
 
@@ -1230,7 +1240,40 @@ var TCI = (function () {
     var next = cur === 'dark' ? 'light' : 'dark';
     root.setAttribute('data-theme', next);
     try { localStorage.setItem('tciPropofolTheme', next); } catch (e) {}
+    if (typeof sendGuide === 'function') sendGuide({ tciGuide: 'theme', theme: next });
   });
+
+  /* ---------- model guide overlay ---------- */
+  // The guide is models.html shown in a full-screen (phone) or centered (desktop) overlay. It loads the first time it is opened.
+  var guide = $('guide'), gframe = $('gframe'), gOpener = null;
+  function themeNow() { return document.documentElement.getAttribute('data-theme') || ''; }
+  function sendGuide(msg) { try { gframe.contentWindow.postMessage(msg, '*'); } catch (e) {} }
+  function openGuide(section, opener) {
+    gOpener = opener || null;
+    guide.hidden = false; document.body.style.overflow = 'hidden';
+    if (!gframe.getAttribute('src')) {
+      gframe.addEventListener('load', function () { sendGuide({ tciGuide: 'theme', theme: themeNow() }); try { gframe.contentWindow.focus(); } catch (e) {} }, { once: true });
+      gframe.setAttribute('src', 'models.html?embed=1' + (section ? '#' + section : ''));
+    } else {
+      sendGuide({ tciGuide: 'theme', theme: themeNow() });
+      if (section) sendGuide({ tciGuide: 'goto', id: section });
+      try { gframe.contentWindow.focus(); } catch (e) {}
+    }
+  }
+  function closeGuide() {
+    guide.hidden = true; document.body.style.overflow = '';
+    if (gOpener) { try { gOpener.focus(); } catch (e) {} }
+  }
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest('a[data-guide]');
+    if (!a) return;
+    e.preventDefault(); openGuide(a.getAttribute('data-guide'), a);
+  });
+  guide.addEventListener('click', function (e) { if (e.target === guide) closeGuide(); });
+  window.addEventListener('message', function (e) {
+    if (e.source === gframe.contentWindow && e.data && e.data.tciGuide === 'close') closeGuide();
+  });
+  document.addEventListener('keydown', function (e) { if (!guide.hidden && e.key === 'Escape') closeGuide(); });
 
   /* ---------- offline support ---------- */
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {

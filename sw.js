@@ -1,5 +1,5 @@
 // Offline support. Bump VERSION when you change any cached file so installed copies pick up the update.
-var VERSION = 'v2';
+var VERSION = 'v3';
 var CACHE = 'propofol-sim-' + VERSION;
 var FONT_CACHE = 'propofol-sim-fonts';
 var SHELL = ['./', 'index.html', 'models.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
